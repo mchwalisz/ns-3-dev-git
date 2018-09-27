@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: kwong yin <kwong-sang.yin@boeing.com>
- *         Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
+ *         Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 #include "lr-wpan-mac-header.h"
 #include <ns3/address-utils.h>
@@ -713,7 +713,7 @@ LrWpanMacHeader::Print (std::ostream &os) const
 
     for (std::list<HeaderIE>::const_iterator it = headerie.begin();it!=headerie.end();it++) {
 
-      os << "Lenght = " << (uint32_t) it->length
+      os << "Length = " << (uint32_t) it->length
          << ", Type = " << (uint32_t) it->type
          << ", ID = " << (uint32_t)  it->id;
 

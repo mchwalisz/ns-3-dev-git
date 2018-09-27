@@ -19,6 +19,7 @@
  *  Tom Henderson <thomas.r.henderson@boeing.com>
  *  Tommaso Pecorella <tommaso.pecorella@unifi.it>
  *  Margherita Filippetti <morag87@gmail.com>
+ *  Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 #ifndef LR_WPAN_TSCH_NET_DEVICE_H
 #define LR_WPAN_TSCH_NET_DEVICE_H
@@ -30,7 +31,7 @@
 namespace ns3 {
 
 class LrWpanPhy;
-//class LrWpanCsmaCa;
+class LrWpanCsmaCa;
 class SpectrumChannel;
 class Node;
 
@@ -78,7 +79,7 @@ public:
    *
    * \param csmaca the CSMA/CA implementation to be used
    */
-  //void SetCsmaCa (Ptr<LrWpanCsmaCa> csmaca);
+  void SetCsmaCa (Ptr<LrWpanCsmaCa> csmaca);
 
   /**
    * Set the channel to which the NetDevice, and therefore the PHY, should be
@@ -93,7 +94,9 @@ public:
    *
    * \return the MAC object
    */
-  Ptr<LrWpanTschMac> GetMac (void) const;
+  Ptr<LrWpanMac> GetMac (void) const;
+  Ptr<LrWpanTschMac> GetNMac (void) const;
+  Ptr<LrWpanMac> GetOMac (void) const;
 
   /**
    * Get the PHY used by this NetDevice.
@@ -107,7 +110,7 @@ public:
    *
    * \return the CSMA/CA implementation object
    */
-  //Ptr<LrWpanCsmaCa> GetCsmaCa (void) const;
+  Ptr<LrWpanCsmaCa> GetCsmaCa (void) const;
 
   // From class NetDevice
   virtual void SetIfIndex (const uint32_t index);
@@ -181,6 +184,7 @@ public:
    */
   void ModeConfirm (MlmeTschModeConfirmParams params);
 
+  void SetTschMode(bool enable);
 private:
   // Inherited from NetDevice/Object
   virtual void DoDispose (void);
@@ -208,10 +212,16 @@ private:
    */
   void CompleteConfig (void);
 
+  int m_isTsch;
   /**
-   * The MAC for this NetDevice.
+   * The TSCH MAC for this NetDevice.
    */
   Ptr<LrWpanTschMac> m_mac;
+
+  /**
+   * The standard MAC for this NetDevice.
+   */
+  Ptr<LrWpanMac> m_omac;
 
   /**
    * The PHY for this NetDevice.
@@ -221,7 +231,7 @@ private:
   /**
    * The CSMA/CA implementation for this NetDevice.
    */
-  //Ptr<LrWpanCsmaCa> m_csmaca;
+  Ptr<LrWpanCsmaCa> m_csmaca;
 
   /**
    * The node associated with this NetDevice.

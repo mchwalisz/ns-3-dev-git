@@ -19,9 +19,6 @@
  * Author: Luis Pacheco <luisbelem@gmail.com>
  * Author: Peter Kourzanov <peter.kourzanov@gmail.com>
  */
-
-
-
 #include <iostream>
 
 #include <ns3/core-module.h>
@@ -52,8 +49,7 @@
 #include "ns3/lr-wpan-module.h"
 #include "ns3/sixlowpan-module.h"
 
-
-NS_LOG_COMPONENT_DEFINE ("TschRich");
+NS_LOG_COMPONENT_DEFINE ("TschTest");
 
 using namespace ns3;
 using namespace std;
@@ -68,18 +64,9 @@ double duration = 20;       //simulation total duration, in seconds
 bool verbose = false;       //enable logging (different from trace)
 bool interference = false;  //enable wifi interference
 
-
 /////////////////////////////////
 // End configuration
 /////////////////////////////////
-
-void SchedulePackets(Ptr<NetDevice> dev, Address addr)
-{
-  Ptr<Packet> p1 = Create<Packet> (pktsize);
-  dev->Send(p1,addr,0x86DD);
-  Simulator::Schedule (Seconds((nrnodes*0.01/duty_cycle)), &SchedulePackets,dev,addr);
-}
-
 void SingleWifiPacket(NodeContainer ofdmNodes, Ptr<SpectrumChannel> channel)
 {
   WifiSpectrumValue5MhzFactory sf;
@@ -172,6 +159,10 @@ int main (int argc, char** argv)
   cmd.Parse (argc, argv);
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue (true));
 
+  //Enable PCAP and Ascii Tracing
+  AsciiTraceHelper ascii;
+
+  //Schedule wifi device
   NodeContainer ofdmNodes;
   NodeContainer panCoord;
   NodeContainer sensors;
@@ -201,13 +192,6 @@ int main (int argc, char** argv)
   mobility.Install (allNodes);
 
   /////////////////////////////////
-  // Upper layers
-  /////////////////////////////////
-  //IPv6
-  InternetStackHelper internetv6;
-  internetv6.SetIpv4StackInstall (false);
-  internetv6.Install (lrwpanNodes);
-  /////////////////////////////////
   // Channel
   /////////////////////////////////
 
@@ -219,20 +203,26 @@ int main (int argc, char** argv)
   // Configure lrwpan nodes
   /////////////////////////////////
 
-  LrWpanTschHelper lrWpanHelper(channel,nrnodes+1,true,true);
+  LrWpanTschHelper lrWpanHelper(channel,nrnodes+1,false,true);
+  Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream ("lr-wpan-tsch.tr");
+  Ptr<OutputStreamWrapper> fstream = ascii.CreateFileStream ("lr-wpan-tsch.fading");
+  lrWpanHelper.PrintFadingBiasValues(fstream);
   NetDeviceContainer netdev = lrWpanHelper.Install (lrwpanNodes);
 
-  lrWpanHelper.AssociateToPan(netdev,123);
-  lrWpanHelper.ConfigureSlotframeAllToPan(netdev,0);//devices,empty slots
-  //Simulator::Schedule(Seconds(5),&EnableTsch,&lrWpanHelper,netdev);
+  lrWpanHelper.EnablePcapAll (string ("lr-wpan-tsch"), true);
+  lrWpanHelper.EnableAsciiAll (stream);
 
-  for (int i = 0;i<=nrnodes;i++) {
-	  cout << DynamicCast<LrWpanTschNetDevice>(netdev.Get(i))->GetMac()->GetShortAddress() << endl;
-  }
+  lrWpanHelper.AssociateToPan(netdev,123);
+  lrWpanHelper.ConfigureSlotframeAllToPan(netdev,0,true,false);//devices,empty slots,bidirectional=true,use broadcast cells=false
+  Simulator::Schedule(Seconds(5),&EnableTsch,&lrWpanHelper,netdev);
 
   /////////////////////////////////
   // Upper layers
   /////////////////////////////////
+  //IPv6
+  InternetStackHelper internetv6;
+  internetv6.SetIpv4StackInstall (false);
+  internetv6.Install (lrwpanNodes);
   //Sixlowpan stack
   StackHelper stackHelper;
   SixLowPanHelper sixlowpan;
@@ -242,23 +232,16 @@ int main (int argc, char** argv)
   ipv6.SetBase (Ipv6Address("2001:1::"), Ipv6Prefix (64));
   Ipv6InterfaceContainer deviceInterfaces = ipv6.Assign (devices);
 
-if (0) {
-  cout<< deviceInterfaces.GetAddress(0,0)<<endl;
-  cout<< deviceInterfaces.GetAddress(1,0)<<endl;
-  cout<< deviceInterfaces.GetAddress(10,0)<<endl;
-  cout<< deviceInterfaces.GetAddress(0,1)<<endl;
-  cout<< deviceInterfaces.GetAddress(1,1)<<endl;
-  cout<< deviceInterfaces.GetAddress(10,1)<<endl;
-  }
-
   for (int i = 1;i<=nrnodes;i++) {
 	  deviceInterfaces.SetForwarding(i,true);
 	  deviceInterfaces.SetDefaultRoute(i,0);
   }
 
-if (0) for (int i=0;i<=nrnodes;i++) {
-	Ptr<Node> n=panCoord.Get(0);
-  	cout << "=== node " << n << " ===" << endl;
+  for (int i=0;i<=nrnodes;i++) {
+	Ptr<Node> n=lrwpanNodes.Get(i);
+  	cout << "=== node " << deviceInterfaces.GetAddress(i,0) 
+	     << " (IEEE " << DynamicCast<LrWpanTschNetDevice>(netdev.Get(i))->GetMac()->GetShortAddress() << ")"
+	     << " ===" << endl;
 	stackHelper.PrintRoutingTable (n);
   }
 
@@ -271,33 +254,19 @@ if (0) for (int i=0;i<=nrnodes;i++) {
 
   ApplicationContainer apps;
 
-if (1)
-  for (int i = 1;i<=nrnodes;i++)
+  for (int i=1;i<=nrnodes;i++)
     {
       ping6.SetLocal (deviceInterfaces.GetAddress (i, 1));
       ping6.SetRemote (deviceInterfaces.GetAddress (0, 1));
       apps.Add (ping6.Install (lrwpanNodes.Get (i)));
     }
-  //Enable PCAP and Ascii Tracing
-  lrWpanHelper.EnablePcapAll (string ("lr-wpan-rich"), true);
-  AsciiTraceHelper ascii;
-  Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream ("lr-wpan-rich.tr");
-  lrWpanHelper.EnableAsciiAll (stream);
-
-  //Schedule wifi device
-  if (interference) SingleWifiPacket(ofdmNodes, channel);
-
-if (0) {
-  SchedulePackets(netdev.Get(1),netdev.Get(0)->GetAddress ());
-  for (int i = 2;i<=nrnodes;i++)
-    {
-      Simulator::Schedule(Seconds(0.01*(i-1) - 0.0001),&SchedulePackets,netdev.Get(i),netdev.Get(0)->GetAddress ());
-    }
-}
   for (int i=1; i<=nrnodes; i++) {
   	apps.Get(i-1)->SetStartTime (Seconds (i-1));
   }
   apps.Stop (Seconds (duration));
+
+  if (interference) SingleWifiPacket(ofdmNodes, channel);
+
   /////////////////////////////////
   // Start and finish the simulation
   /////////////////////////////////

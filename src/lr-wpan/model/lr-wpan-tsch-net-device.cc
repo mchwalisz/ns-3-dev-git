@@ -19,10 +19,12 @@
  *  Tom Henderson <thomas.r.henderson@boeing.com>
  *  Tommaso Pecorella <tommaso.pecorella@unifi.it>
  *  Margherita Filippetti <morag87@gmail.com>
+ *  Peter Kourzanov <peter.kourzanov@gmail.com>
  */
+#include <cassert>
 #include "lr-wpan-tsch-net-device.h"
 #include "lr-wpan-phy.h"
-//#include "lr-wpan-csmaca.h"
+#include "lr-wpan-csmaca.h"
 #include "lr-wpan-error-model.h"
 #include <ns3/abort.h>
 #include <ns3/node.h>
@@ -69,12 +71,13 @@ LrWpanTschNetDevice::GetTypeId (void)
 }
 
 LrWpanTschNetDevice::LrWpanTschNetDevice ()
-  : m_configComplete (false)
+  : m_isTsch(-1),m_configComplete (false)
 {
   NS_LOG_FUNCTION (this);
   m_mac = CreateObject<LrWpanTschMac> ();
+  m_omac = CreateObject<LrWpanMac> ();
   m_phy = CreateObject<LrWpanPhy> ();
-  //m_csmaca = CreateObject<LrWpanCsmaCa> ();
+  m_csmaca = CreateObject<LrWpanCsmaCa> ();
   CompleteConfig ();
 }
 
@@ -88,12 +91,14 @@ void
 LrWpanTschNetDevice::DoDispose (void)
 {
   NS_LOG_FUNCTION (this);
+  m_omac->Dispose ();
   m_mac->Dispose ();
   m_phy->Dispose ();
-  //m_csmaca->Dispose ();
+  m_csmaca->Dispose ();
   m_phy = 0;
   m_mac = 0;
-  //m_csmaca = 0;
+  m_omac = 0;
+  m_csmaca = 0;
   m_node = 0;
   // chain up.
   NetDevice::DoDispose ();
@@ -106,6 +111,7 @@ LrWpanTschNetDevice::DoInitialize (void)
   NS_LOG_FUNCTION (this);
   m_phy->Initialize ();
   m_mac->Initialize ();
+  m_omac->Initialize ();
   NetDevice::DoInitialize ();
 }
 
@@ -115,6 +121,8 @@ LrWpanTschNetDevice::CompleteConfig (void)
 {
   NS_LOG_FUNCTION (this);
   if (m_mac == 0
+      || m_omac == 0
+      || m_csmaca == 0
       || m_phy == 0
       || m_node == 0
       || m_configComplete)
@@ -123,29 +131,26 @@ LrWpanTschNetDevice::CompleteConfig (void)
     }
 
   m_mac->SetPhy (m_phy);
-  //m_mac->SetCsmaCa (m_csmaca);
+  m_omac->SetPhy (m_phy);
+  m_omac->SetCsmaCa (m_csmaca);
   m_mac->SetMcpsDataIndicationCallback (MakeCallback (&LrWpanTschNetDevice::McpsDataIndication, this));
-  //m_csmaca->SetMac (m_mac);
+  m_omac->SetMcpsDataIndicationCallback (MakeCallback (&LrWpanTschNetDevice::McpsDataIndication, this));
+  m_csmaca->SetMac (m_omac);
 
   m_phy->SetMobility (m_node->GetObject<MobilityModel> ());
   Ptr<LrWpanErrorModel> model = CreateObject<LrWpanErrorModel> ();
   m_phy->SetErrorModel (model);
   m_phy->SetDevice (this);
 
-  m_phy->SetPdDataIndicationCallback (MakeCallback (&LrWpanTschMac::PdDataIndication, m_mac));
-  m_phy->SetPdDataConfirmCallback (MakeCallback (&LrWpanTschMac::PdDataConfirm, m_mac));
-  m_phy->SetPlmeEdConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeEdConfirm, m_mac));
-  m_phy->SetPlmeGetAttributeConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeGetAttributeConfirm, m_mac));
-  m_phy->SetPlmeSetTRXStateConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeSetTRXStateConfirm, m_mac));
-  m_phy->SetPlmeSetAttributeConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeSetAttributeConfirm, m_mac));
-
+  // TSCH MAC specific callbacks
   m_mac->SetMlmeSetSlotframeConfirmCallback(MakeCallback (&LrWpanTschNetDevice::SlotframeConfirm,this));
   m_mac->SetMlmeSetLinkConfirmCallback(MakeCallback (&LrWpanTschNetDevice::LinkConfirm,this));
   m_mac->SetMlmeTschModeConfirmCallback(MakeCallback (&LrWpanTschNetDevice::ModeConfirm,this));
 
-  //m_csmaca->SetLrWpanTschMacStateCallback (MakeCallback (&LrWpanTschMac::SetLrWpanMacState, m_mac));
-  //m_phy->SetPlmeCcaConfirmCallback (MakeCallback (&LrWpanCsmaCa::PlmeCcaConfirm, m_csmaca));
-  m_phy->SetPlmeCcaConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeCcaConfirm, m_mac));
+  m_csmaca->SetLrWpanMacStateCallback (MakeCallback (&LrWpanMac::SetLrWpanMacState, m_omac));
+
+  // the rest is done here
+  SetTschMode(false);
   m_configComplete = true;
 }
 
@@ -164,7 +169,7 @@ LrWpanTschNetDevice::SetPhy (Ptr<LrWpanPhy> phy)
   m_phy = phy;
   CompleteConfig ();
 }
-/*
+
 void
 LrWpanTschNetDevice::SetCsmaCa (Ptr<LrWpanCsmaCa> csmaca)
 {
@@ -172,7 +177,7 @@ LrWpanTschNetDevice::SetCsmaCa (Ptr<LrWpanCsmaCa> csmaca)
   m_csmaca = csmaca;
   CompleteConfig ();
 }
-*/
+
 void
 LrWpanTschNetDevice::SetChannel (Ptr<SpectrumChannel> channel)
 {
@@ -183,10 +188,29 @@ LrWpanTschNetDevice::SetChannel (Ptr<SpectrumChannel> channel)
 }
 
 Ptr<LrWpanTschMac>
+LrWpanTschNetDevice::GetNMac (void) const
+{
+  // NS_LOG_FUNCTION (this);
+  //assert(m_isTsch==true);
+  return m_mac;
+}
+
+Ptr<LrWpanMac>
+LrWpanTschNetDevice::GetOMac (void) const
+{
+  // NS_LOG_FUNCTION (this);
+  //assert(m_isTsch==false);
+  //if (m_isTsch) return m_mac;
+  return m_omac;
+}
+
+Ptr<LrWpanMac>
 LrWpanTschNetDevice::GetMac (void) const
 {
   // NS_LOG_FUNCTION (this);
-  return m_mac;
+  assert(m_isTsch>=0);
+  if (m_isTsch) return m_mac;
+  return m_omac;
 }
 
 Ptr<LrWpanPhy>
@@ -195,14 +219,14 @@ LrWpanTschNetDevice::GetPhy (void) const
   NS_LOG_FUNCTION (this);
   return m_phy;
 }
-/*
+
 Ptr<LrWpanCsmaCa>
 LrWpanTschNetDevice::GetCsmaCa (void) const
 {
   NS_LOG_FUNCTION (this);
   return m_csmaca;
 }
-*/
+
 void
 LrWpanTschNetDevice::SetIfIndex (const uint32_t index)
 {
@@ -251,14 +275,22 @@ void
 LrWpanTschNetDevice::SetAddress (Address address)
 {
   NS_LOG_FUNCTION (this);
-  m_mac->SetShortAddress (Mac16Address::ConvertFrom (address));
+  assert(m_isTsch>=0);
+  if (m_isTsch)
+	  m_mac->SetShortAddress (Mac16Address::ConvertFrom (address));
+  else
+	  m_omac->SetShortAddress (Mac16Address::ConvertFrom (address));
 }
 
 Address
 LrWpanTschNetDevice::GetAddress (void) const
 {
   NS_LOG_FUNCTION (this);
-  return m_mac->GetShortAddress ();
+  assert(m_isTsch>=0);
+  if ( m_isTsch)
+	  return m_mac->GetShortAddress ();
+  else 
+	  return m_omac->GetShortAddress ();
 }
 
 bool
@@ -384,25 +416,32 @@ LrWpanTschNetDevice::Send (Ptr<Packet> packet, const Address& dest, uint16_t pro
       return false;
     }
 
-  TschMcpsDataRequestParams m_mcpsDataRequestParams;
-  LrWpanFrameControlOptions frmcontrol;
-  m_mcpsDataRequestParams.m_frameControlOptions = frmcontrol;
-  m_mcpsDataRequestParams.m_dstAddr = Mac16Address::ConvertFrom (dest);
-  m_mcpsDataRequestParams.m_dstAddrMode = SHORT_ADDR;
-  m_mcpsDataRequestParams.m_srcAddrMode = NO_PANID_ADDR;
+  assert(m_isTsch>=0);
+  if ( m_isTsch) {
+	  TschMcpsDataRequestParams m_mcpsDataRequestParams;
+	  LrWpanFrameControlOptions frmcontrol;
+	  m_mcpsDataRequestParams.m_frameControlOptions = frmcontrol;
+	  m_mcpsDataRequestParams.m_dstAddr = Mac16Address::ConvertFrom (dest);
+	  m_mcpsDataRequestParams.m_dstAddrMode = SHORT_ADDR;
+	  m_mcpsDataRequestParams.m_srcAddrMode = NO_PANID_ADDR;
 
-  if (Mac16Address::ConvertFrom (dest) == Mac16Address("ff:ff"))
-    {
-      m_mcpsDataRequestParams.m_ACK_TX = false;
-    }
-  else
-    {
-      m_mcpsDataRequestParams.m_ACK_TX = m_useAcks;
-    }
+	  m_mcpsDataRequestParams.m_ACK_TX = (Mac16Address::ConvertFrom (dest) == Mac16Address("ff:ff")) ? false : m_useAcks;
+	  m_mcpsDataRequestParams.m_msduHandle = 0;
 
-  m_mcpsDataRequestParams.m_msduHandle = 0;
-  m_mcpsDataRequestParams.m_dstPanId = m_mac->GetPanId ();
-  m_mac->McpsDataRequest (m_mcpsDataRequestParams, packet);
+	  m_mcpsDataRequestParams.m_dstPanId = m_mac->GetPanId ();
+	  m_mac->McpsDataRequest (m_mcpsDataRequestParams, packet);
+  } else {
+	  McpsDataRequestParams m_mcpsDataRequestParams;
+	  m_mcpsDataRequestParams.m_dstAddr = Mac16Address::ConvertFrom (dest);
+	  m_mcpsDataRequestParams.m_dstAddrMode = SHORT_ADDR;
+	  m_mcpsDataRequestParams.m_dstPanId = m_omac->GetPanId ();
+	  m_mcpsDataRequestParams.m_srcAddrMode = SHORT_ADDR;
+
+	  m_mcpsDataRequestParams.m_txOptions = m_useAcks ? TX_OPTION_ACK : 0;
+	  m_mcpsDataRequestParams.m_msduHandle = 0;
+
+	  m_omac->McpsDataRequest (m_mcpsDataRequestParams, packet);
+  }
   return true;
 }
 
@@ -422,16 +461,31 @@ LrWpanTschNetDevice::Send (Ptr<Packet> packet, const Address& dest, bool use_ack
       return false;
     }
 
-  TschMcpsDataRequestParams m_mcpsDataRequestParams;
-  LrWpanFrameControlOptions frmcontrol;
-  m_mcpsDataRequestParams.m_frameControlOptions = frmcontrol;
-  m_mcpsDataRequestParams.m_dstAddr = Mac16Address::ConvertFrom (dest);
-  m_mcpsDataRequestParams.m_dstAddrMode = SHORT_ADDR;
-  m_mcpsDataRequestParams.m_srcAddrMode = NO_PANID_ADDR;
-  m_mcpsDataRequestParams.m_ACK_TX = use_ack;
-  m_mcpsDataRequestParams.m_msduHandle = 0;
-  m_mcpsDataRequestParams.m_dstPanId = m_mac->GetPanId ();
-  m_mac->McpsDataRequest (m_mcpsDataRequestParams, packet);
+  assert(m_isTsch>=0);
+  if ( m_isTsch) {
+	  TschMcpsDataRequestParams m_mcpsDataRequestParams;
+	  LrWpanFrameControlOptions frmcontrol;
+	  m_mcpsDataRequestParams.m_frameControlOptions = frmcontrol;
+	  m_mcpsDataRequestParams.m_dstAddr = Mac16Address::ConvertFrom (dest);
+	  m_mcpsDataRequestParams.m_dstAddrMode = SHORT_ADDR;
+	  m_mcpsDataRequestParams.m_srcAddrMode = NO_PANID_ADDR;
+	  m_mcpsDataRequestParams.m_ACK_TX = use_ack;
+	  m_mcpsDataRequestParams.m_msduHandle = 0;
+
+	  m_mcpsDataRequestParams.m_dstPanId = m_mac->GetPanId ();
+	  m_mac->McpsDataRequest (m_mcpsDataRequestParams, packet);
+  } else {
+	  McpsDataRequestParams m_mcpsDataRequestParams;
+	  m_mcpsDataRequestParams.m_dstAddr = Mac16Address::ConvertFrom (dest);
+	  m_mcpsDataRequestParams.m_dstAddrMode = SHORT_ADDR;
+	  m_mcpsDataRequestParams.m_dstPanId = m_omac->GetPanId ();
+	  m_mcpsDataRequestParams.m_srcAddrMode = SHORT_ADDR;
+
+	  m_mcpsDataRequestParams.m_txOptions = use_ack ? TX_OPTION_ACK : 0;
+	  m_mcpsDataRequestParams.m_msduHandle = 0;
+
+	  m_omac->McpsDataRequest (m_mcpsDataRequestParams, packet);
+  }
   return true;
 }
 bool
@@ -502,7 +556,7 @@ LrWpanTschNetDevice::AssignStreams (int64_t stream)
 {
   NS_LOG_FUNCTION (stream);
   int64_t streamIndex = stream;
-  //streamIndex += m_csmaca->AssignStreams (stream);
+  streamIndex += m_csmaca->AssignStreams (stream);
   streamIndex += m_phy->AssignStreams (stream);
   NS_LOG_DEBUG ("Number of assigned RV streams:  " << (streamIndex - stream));
   return (streamIndex - stream);
@@ -525,5 +579,44 @@ void
 LrWpanTschNetDevice::ModeConfirm (MlmeTschModeConfirmParams params)
 {
   NS_LOG_FUNCTION (this);
+}
+
+void
+LrWpanTschNetDevice::SetTschMode (bool enable)
+{
+  NS_LOG_FUNCTION (this);
+  if (m_isTsch==true && enable) return;
+  if (m_isTsch==false && !enable) return;
+  if (m_isTsch!=true && enable) {
+	  m_phy->SetPdDataIndicationCallback (MakeCallback (&LrWpanTschMac::PdDataIndication, m_mac));
+	  m_phy->SetPdDataConfirmCallback (MakeCallback (&LrWpanTschMac::PdDataConfirm, m_mac));
+	  m_phy->SetPlmeEdConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeEdConfirm, m_mac));
+	  m_phy->SetPlmeGetAttributeConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeGetAttributeConfirm, m_mac));
+	  m_phy->SetPlmeSetTRXStateConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeSetTRXStateConfirm, m_mac));
+	  m_phy->SetPlmeSetAttributeConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeSetAttributeConfirm, m_mac));
+
+	  m_phy->SetPlmeCcaConfirmCallback (MakeCallback (&LrWpanTschMac::PlmeCcaConfirm, m_mac));
+
+	  MlmeTschModeRequestParams modeRequest;
+	  modeRequest.TSCHMode = MlmeTschMode_ON;
+	  m_mac->MlmeTschModeRequest(modeRequest);
+	  m_isTsch=true;
+  }
+  if (m_isTsch!=false && !enable) {
+	  MlmeTschModeRequestParams modeRequest;
+	  modeRequest.TSCHMode = MlmeTschMode_OFF;
+	  m_mac->MlmeTschModeRequest(modeRequest);
+
+	  m_phy->SetPdDataIndicationCallback (MakeCallback (&LrWpanMac::PdDataIndication, m_omac));
+	  m_phy->SetPdDataConfirmCallback (MakeCallback (&LrWpanMac::PdDataConfirm, m_omac));
+	  m_phy->SetPlmeEdConfirmCallback (MakeCallback (&LrWpanMac::PlmeEdConfirm, m_omac));
+	  m_phy->SetPlmeGetAttributeConfirmCallback (MakeCallback (&LrWpanMac::PlmeGetAttributeConfirm, m_omac));
+	  m_phy->SetPlmeSetTRXStateConfirmCallback (MakeCallback (&LrWpanMac::PlmeSetTRXStateConfirm, m_omac));
+	  m_phy->SetPlmeSetAttributeConfirmCallback (MakeCallback (&LrWpanMac::PlmeSetAttributeConfirm, m_omac));
+
+	  m_phy->SetPlmeCcaConfirmCallback (MakeCallback (&LrWpanCsmaCa::PlmeCcaConfirm, m_csmaca));
+
+	  m_isTsch=false;
+  }
 }
 } // namespace ns3

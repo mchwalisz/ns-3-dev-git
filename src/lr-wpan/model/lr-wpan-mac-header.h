@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  *  Author: kwong yin <kwong-sang.yin@boeing.com>
- *          Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
+ *          Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 
 /*

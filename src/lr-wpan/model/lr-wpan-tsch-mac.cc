@@ -23,6 +23,7 @@
  *  Erwan Livolant <erwan.livolant@inria.fr>
  *  Luis Pacheco <luisbelem@gmail.com>
  *  Peishuo Li <pressthunder@gmail.com>
+ *  Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 
 #include "lr-wpan-tsch-mac.h"
@@ -1486,8 +1487,13 @@ LrWpanTschMac::ScheduleTimeslot(uint8_t handle, uint16_t size)
           phyattr->phyCurrentChannel = m_currentChannel;
           if (it->macLinkFadingBias != NULL){
               phyattr->phyLinkFadingBias = it->macLinkFadingBias[m_currentChannel-11] ;
-              m_currentFadingBias = 10 * log10(phyattr->phyLinkFadingBias);
-          }
+          } else {
+              phyattr->phyLinkFadingBias = 1;
+	  }
+	  NS_LOG_DEBUG (this << "setting for channel " << (int)m_currentChannel 
+                << " fading bias: " <<
+		phyattr->phyLinkFadingBias);
+	  m_currentFadingBias = 10 * log10(phyattr->phyLinkFadingBias);
           Simulator::ScheduleNow (&LrWpanPhy::PlmeSetAttributeRequest,m_phy,phyCurrentChannel,phyattr);
         }
 

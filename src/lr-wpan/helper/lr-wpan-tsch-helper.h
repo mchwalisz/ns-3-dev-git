@@ -68,7 +68,7 @@ public:
    */
   LrWpanTschHelper (void);
   LrWpanTschHelper (Ptr<SpectrumChannel> ch);
-  LrWpanTschHelper (Ptr<SpectrumChannel> ch, u_int32_t num_node, bool nakagami, bool isDay);
+  LrWpanTschHelper (Ptr<SpectrumChannel> ch, u_int32_t num_node, bool fadingBiasMatrix, bool isDay);
   virtual ~LrWpanTschHelper (void);
 
   /**
@@ -196,7 +196,7 @@ public:
    * @param devs: a set of netdevices
    * @param empty_timeslots
    */
-  void ConfigureSlotframeAllToPan(NetDeviceContainer devs, int empty_timeslots);
+  void ConfigureSlotframeAllToPan(NetDeviceContainer devs, int empty_timeslots, bool bidir, bool bcast);
 
   /**
    * @brief EnableTsch: activate and deactivate TSCH
@@ -250,15 +250,18 @@ public:
   /**
    * @brief Add an advertising link
    * @param all devices
-   * @param position of the semder in the device container
+   * @param position of the sender in the device container
    * @param link params
    */
   void AddAdvLink(NetDeviceContainer devs,u_int32_t senderPos, AddLinkParams params);
 
   /**
-   * TODO
-   **/
-  void AddBcastLinks(NetDeviceContainer devs,AddLinkParams params);
+   * @brief Add a broadcast link
+   * @param all devices
+   * @param position of the receiver in the device container
+   * @param link params
+   */
+  void AddBcastLinks(NetDeviceContainer devs,u_int32_t coordinatorPos, AddLinkParams params);
 
   /**
    * @brief Set the bias coefficients which describe the multi-path effect on the current channel
@@ -328,7 +331,7 @@ private:
   Ptr<UniformRandomVariable> m_random;          // random variable to set the 3D matrix values
   double MinFadingBias;
   double MaxFadingBias;
-  bool m_nakagami;
+  bool m_fadingBiasMatrix;
   bool m_isDay;
 };
 

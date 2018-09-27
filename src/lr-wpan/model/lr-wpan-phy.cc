@@ -19,7 +19,7 @@
  *  Gary Pei <guangyu.pei@boeing.com>
  *  Sascha Alexander Jopen <jopen@cs.uni-bonn.de>
  *  Peishuo Li <pressthunder@gmail.com>
- *  Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
+ *  Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 #include "lr-wpan-phy.h"
 #include "lr-wpan-lqi-tag.h"
@@ -326,7 +326,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
   NS_ASSERT (p != 0);
 
   // Prevent PHY from receiving another packet while switching the transceiver state.
-  if (m_trxState == IEEE_802_15_4_PHY_RX_ON && !m_setTRXState.IsRunning ())
+  if (m_trxState == IEEE_802_15_4_PHY_RX_ON && !m_setTRXState.IsRunning () && lrWpanRxParams != 0)
     {
       // The specification doesn't seem to refer to BUSY_RX, but vendor
       // data sheets suggest that this is a substate of the RX_ON state
@@ -344,7 +344,11 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 
       // Add any incoming packet to the current interference before checking the
       // SINR.
-      NS_LOG_DEBUG (this << " receiving packet with power: " << 10 * log10(LrWpanSpectrumValueHelper::TotalAvgPower (lrWpanRxParams->psd, m_phyPIBAttributes.phyCurrentChannel)) + 30 << "dBm");
+      m_receivedPower = 10 * log10(LrWpanSpectrumValueHelper::TotalAvgPower (lrWpanRxParams->psd,m_phyPIBAttributes.phyCurrentChannel)
+                        * m_phyPIBAttributes.phyLinkFadingBias) + 30;
+
+      NS_LOG_DEBUG (this << " receiving packet with power: " << m_receivedPower << "dBm");
+
       m_signal->AddSignal (lrWpanRxParams->psd);
       Ptr<SpectrumValue> interferenceAndNoise = m_signal->GetSignalPsd ();
       *interferenceAndNoise -= *lrWpanRxParams->psd;

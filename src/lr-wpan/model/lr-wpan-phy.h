@@ -19,7 +19,7 @@
  *  Gary Pei <guangyu.pei@boeing.com>
  *  Sascha Alexander Jopen <jopen@cs.uni-bonn.de>
  *  Peishuo Li <pressthunder@gmail.com>
- *  Pjotr Kourzanov <peter.kourzanov@xs4all.nl> 
+ *  Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 #ifndef LR_WPAN_PHY_H
 #define LR_WPAN_PHY_H

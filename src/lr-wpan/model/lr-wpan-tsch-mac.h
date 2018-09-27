@@ -22,6 +22,7 @@
  *  Sascha Alexander Jopen <jopen@cs.uni-bonn.de>
  *  Luis Pacheco <luisbelem@gmail.com>
  *  Peishuo Li <pressthunder@gmail.com>
+ *  Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 #ifndef LR_WPAN_TSCH_MAC_H
 #define LR_WPAN_TSCH_MAC_H
@@ -345,7 +346,7 @@ typedef Callback<void, McpsDataIndicationParams, Ptr<Packet> > McpsDataIndicatio
  *
  * Class that implements the LR-WPAN TSCH Mac state machine
  */
-class LrWpanTschMac : public Object
+class LrWpanTschMac : public LrWpanMac //Object
 {
 public:
   /**

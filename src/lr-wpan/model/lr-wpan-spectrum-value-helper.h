@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Gary Pei <guangyu.pei@boeing.com>
- *         Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
+ *         Peter Kourzanov <peter.kourzanov@gmail.com>
  */
 #ifndef LR_WPAN_SPECTRUM_VALUE_HELPER_H
 #define LR_WPAN_SPECTRUM_VALUE_HELPER_H

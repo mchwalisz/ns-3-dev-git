@@ -20,7 +20,9 @@
  *  Tom Henderson <thomas.r.henderson@boeing.com>
  *  Luis Pacheco <luisbelem@gmail.com>
  *  Peishuo Li <pressthunder@gmail.com>
+ *  Peter Kourzanov <peter.kourzanov@gmail.com>
  */
+#include <cassert>
 #include "lr-wpan-tsch-helper.h"
 #include <ns3/energy-module.h>
 #include <ns3/lr-wpan-error-model.h>
@@ -130,19 +132,19 @@ LrWpanTschHelper::LrWpanTschHelper (Ptr<SpectrumChannel> ch)
   m_slotframehandle = 0;
   m_numchannel = 16;
   m_numnode = 0;
-  m_nakagami = false;
+  m_fadingBiasMatrix = false;
   m_isDay = true;
   MinFadingBias = 0;
   MaxFadingBias = 0;
 }
 
-LrWpanTschHelper::LrWpanTschHelper (Ptr<SpectrumChannel> ch, u_int32_t num_node, bool nakagami, bool isDay)
+LrWpanTschHelper::LrWpanTschHelper (Ptr<SpectrumChannel> ch, u_int32_t num_node, bool fadingBiasMatrix, bool isDay)
 {
   m_channel = ch;
   m_slotframehandle = 0;
   m_numchannel = 16;
   m_numnode = num_node;
-  m_nakagami = nakagami;
+  m_fadingBiasMatrix = fadingBiasMatrix;
   m_isDay = isDay;
   if (m_isDay){
       MinFadingBias = -10;
@@ -166,7 +168,7 @@ void
 LrWpanTschHelper::SetFadingBiasValues ()
 {
   FadingBias.Build(m_numnode, m_numnode, m_numchannel);
-  if (m_nakagami)
+  if (m_fadingBiasMatrix)
     {
       m_random = CreateObject<UniformRandomVariable> ();
       m_random->SetAttribute ("Min", DoubleValue ( MinFadingBias));
@@ -176,14 +178,13 @@ LrWpanTschHelper::SetFadingBiasValues ()
           for (uint32_t k=0; k<m_numchannel; k++)
             {
               FadingBias[i][j][k] = pow(10, (m_random->GetValue ()/10));
-                          FadingBias[i][j][k] = 1;
             }
+	    /* for symmetric multi-path fading */
       for (uint32_t i=0; i<m_numnode; i++)
         for (uint32_t j=i+1; j<m_numnode; j++)
           for (uint32_t k=0; k<m_numchannel; k++)
             {
               FadingBias[i][j][k] = FadingBias[j][i][k];
-                          FadingBias[i][j][k] = 1;
             }
     }
   else
@@ -209,7 +210,8 @@ LrWpanTschHelper::PrintFadingBiasValues(Ptr<OutputStreamWrapper> stream_fadingBi
         {
           //*stream_fadingBias -> GetStream () << "Bias[" << (int)i << "][" << (int)j << "][" << (int)k << "] = "
           //  << (double)FadingBias[i][j][k] << " ";
-          *stream_fadingBias -> GetStream () << 10*log10((double)FadingBias[i][j][k]) << " ";
+          //*stream_fadingBias -> GetStream () << 10*log10((double)FadingBias[i][j][k]) << " ";
+          *stream_fadingBias -> GetStream () << (double)FadingBias[i][j][k] << " ";
         }
         //*stream_fadingBias -> GetStream () <<std::endl;
       }
@@ -402,8 +404,10 @@ LrWpanTschHelper::AssociateToPan (NetDeviceContainer c, uint16_t panId)
           Mac16Address address;
           address.CopyFrom (idBuf);
 
-          device->GetMac ()->SetPanId (panId);
-          device->GetMac ()->SetShortAddress (address);
+          device->GetOMac ()->SetPanId (panId);
+          device->GetOMac ()->SetShortAddress (address);
+          device->GetNMac ()->SetPanId (panId);
+          device->GetNMac ()->SetShortAddress (address);
           id++;
         }
     }
@@ -454,12 +458,13 @@ LrWpanTschHelper::EnablePcapInternal (std::string prefix, Ptr<NetDevice> nd, boo
 
   if (promiscuous == true)
     {
-      device->GetMac ()->TraceConnectWithoutContext ("PromiscSniffer", MakeBoundCallback (&PcapSniffLrWpan, file));
-
+      device->GetOMac()->TraceConnectWithoutContext ("PromiscSniffer", MakeBoundCallback (&PcapSniffLrWpan, file));
+      device->GetNMac()->TraceConnectWithoutContext ("PromiscSniffer", MakeBoundCallback (&PcapSniffLrWpan, file));
     }
   else
     {
-      device->GetMac ()->TraceConnectWithoutContext ("Sniffer", MakeBoundCallback (&PcapSniffLrWpan, file));
+      device->GetOMac()->TraceConnectWithoutContext ("Sniffer", MakeBoundCallback (&PcapSniffLrWpan, file));
+      device->GetNMac()->TraceConnectWithoutContext ("Sniffer", MakeBoundCallback (&PcapSniffLrWpan, file));
     }
 }
 
@@ -520,8 +525,10 @@ LrWpanTschHelper::EnableAsciiInternal (
 
       asciiTraceHelper.HookDefaultReceiveSinkWithoutContext<LrWpanTschNetDevice> (device, "MacRx", theStream);
 
-      device->GetMac ()->TraceConnectWithoutContext ("MacTx", MakeBoundCallback (&AsciiLrWpanTschMacTransmitSinkWithoutContext, theStream));
-      device->GetMac ()->TraceConnectWithoutContext ("MacMaxRetries", MakeBoundCallback (&AsciiLrWpanTschMacMaxRetriesSinkWithoutContext, theStream));
+      device->GetOMac()->TraceConnectWithoutContext ("MacTx", MakeBoundCallback (&AsciiLrWpanTschMacTransmitSinkWithoutContext, theStream));
+      device->GetNMac()->TraceConnectWithoutContext ("MacTx", MakeBoundCallback (&AsciiLrWpanTschMacTransmitSinkWithoutContext, theStream));
+      device->GetOMac()->TraceConnectWithoutContext ("MacMaxRetries", MakeBoundCallback (&AsciiLrWpanTschMacMaxRetriesSinkWithoutContext, theStream));
+      device->GetNMac()->TraceConnectWithoutContext ("MacMaxRetries", MakeBoundCallback (&AsciiLrWpanTschMacMaxRetriesSinkWithoutContext, theStream));
       asciiTraceHelper.HookDefaultEnqueueSinkWithoutContext<LrWpanTschNetDevice> (device, "MacTxEnqueue", theStream);
       asciiTraceHelper.HookDefaultDequeueSinkWithoutContext<LrWpanTschNetDevice> (device, "MacTxDequeue", theStream);
       asciiTraceHelper.HookDefaultDropSinkWithoutContext<LrWpanTschNetDevice> (device, "MacTxDrop", theStream);
@@ -544,28 +551,54 @@ LrWpanTschHelper::EnableAsciiInternal (
 
 
   oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacRx";
+  device->GetNMac()->TraceConnect ("MacRx", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultReceiveSinkWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacTx";
+  device->GetNMac()->TraceConnect ("MacTx", oss.str (), MakeBoundCallback (&AsciiLrWpanTschMacTransmitSinkWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacMaxRetries";
+  device->GetNMac()->TraceConnect ("MacMaxRetries", oss.str (), MakeBoundCallback (&AsciiLrWpanTschMacMaxRetriesSinkWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacTxEnqueue";
+  device->GetNMac()->TraceConnect ("MacTxEnqueue", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultEnqueueSinkWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacTxDequeue";
+  device->GetNMac()->TraceConnect ("MacTxDequeue", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultDequeueSinkWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacTxDrop";
+  device->GetNMac()->TraceConnect ("MacTxDrop", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultDropSinkWithContext, stream));
+
+  //
+
+  oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacRx";
-  device->GetMac ()->TraceConnect ("MacRx", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultReceiveSinkWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacRx", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultReceiveSinkWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacTx";
-  device->GetMac ()->TraceConnect ("MacTx", oss.str (), MakeBoundCallback (&AsciiLrWpanTschMacTransmitSinkWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacTx", oss.str (), MakeBoundCallback (&AsciiLrWpanTschMacTransmitSinkWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacMaxRetries";
-  device->GetMac ()->TraceConnect ("MacMaxRetries", oss.str (), MakeBoundCallback (&AsciiLrWpanTschMacMaxRetriesSinkWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacMaxRetries", oss.str (), MakeBoundCallback (&AsciiLrWpanTschMacMaxRetriesSinkWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacTxEnqueue";
-  device->GetMac ()->TraceConnect ("MacTxEnqueue", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultEnqueueSinkWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacTxEnqueue", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultEnqueueSinkWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacTxDequeue";
-  device->GetMac ()->TraceConnect ("MacTxDequeue", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultDequeueSinkWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacTxDequeue", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultDequeueSinkWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacTxDrop";
-  device->GetMac ()->TraceConnect ("MacTxDrop", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultDropSinkWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacTxDrop", oss.str (), MakeBoundCallback (&AsciiTraceHelper::DefaultDropSinkWithContext, stream));
 
 }
 
@@ -620,8 +653,8 @@ LrWpanTschHelper::EnableReceivePower (Ptr<OutputStreamWrapper> stream_recPower, 
       for (uint32_t j = 0; j < node->GetNDevices (); ++j)
         {
           Ptr<LrWpanTschNetDevice> device = node->GetDevice(j)->GetObject<LrWpanTschNetDevice> ();
-          device->GetPhy ()->TraceConnectWithoutContext ("PhyLinkInformation", MakeCallback (&LrWpanTschMac::GetPhylinkInformation, device->GetMac()));
-          device->GetMac ()->TraceConnectWithoutContext ("MacLinkInformation", MakeBoundCallback (&ReceivedPowerTracing, stream_recPower));
+          device->GetPhy ()->TraceConnectWithoutContext ("PhyLinkInformation", MakeCallback (&LrWpanTschMac::GetPhylinkInformation, device->GetNMac()));
+          device->GetNMac()->TraceConnectWithoutContext ("MacLinkInformation", MakeBoundCallback (&ReceivedPowerTracing, stream_recPower));
         }
     }
 }
@@ -652,40 +685,78 @@ LrWpanTschHelper::EnableEnergyInternal (
     }
 
   oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacRxDataTxAck";
+  device->GetNMac()->TraceConnect ("MacRxDataTxAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacTxData";
+  device->GetNMac()->TraceConnect ("MacTxData", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacRxData";
+  device->GetNMac()->TraceConnect ("MacRxData", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacTxDataRxAck";
+  device->GetNMac()->TraceConnect ("MacTxDataRxAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacSleep";
+  device->GetNMac()->TraceConnect ("MacSleep", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacIdle";
+  device->GetNMac()->TraceConnect ("MacIdle", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacChannelBusy";
+  device->GetNMac()->TraceConnect ("MacChannelBusy", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacWaitAck";
+  device->GetNMac()->TraceConnect ("MacWaitAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  oss.str ("");
+  oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/TschMac/MacEmptyBuffer";
+  device->GetNMac()->TraceConnect ("MacEmptyBuffer", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+
+  // 
+
+  oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacRxDataTxAck";
-  device->GetMac ()->TraceConnect ("MacRxDataTxAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacRxDataTxAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacTxData";
-  device->GetMac ()->TraceConnect ("MacTxData", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacTxData", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacRxData";
-  device->GetMac ()->TraceConnect ("MacRxData", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacRxData", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacTxDataRxAck";
-  device->GetMac ()->TraceConnect ("MacTxDataRxAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacTxDataRxAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacSleep";
-  device->GetMac ()->TraceConnect ("MacSleep", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacSleep", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacIdle";
-  device->GetMac ()->TraceConnect ("MacIdle", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacIdle", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacChannelBusy";
-  device->GetMac ()->TraceConnect ("MacChannelBusy", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacChannelBusy", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacWaitAck";
-  device->GetMac ()->TraceConnect ("MacWaitAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacWaitAck", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
   oss.str ("");
   oss << "/NodeList/" << nodeid << "/DeviceList/" << deviceid << "/$ns3::LrWpanTschNetDevice/Mac/MacEmptyBuffer";
-  device->GetMac ()->TraceConnect ("MacEmptyBuffer", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
+  device->GetOMac()->TraceConnect ("MacEmptyBuffer", oss.str (), MakeBoundCallback (&EnergyTraceWithContext, stream));
 
 }
 
@@ -700,7 +771,7 @@ LrWpanTschHelper::AddSlotframe(NetDeviceContainer devs, uint8_t slotframehandle,
   for (NetDeviceContainer::Iterator i = devs.Begin (); i != devs.End (); i++)
     {
       Ptr<LrWpanTschNetDevice> lrDevice = DynamicCast<LrWpanTschNetDevice> (*i);
-      lrDevice->GetMac ()->MlmeSetSlotframeRequest (slotframeRequest);
+      lrDevice->GetNMac()->MlmeSetSlotframeRequest (slotframeRequest);
     }
 }
 
@@ -712,7 +783,7 @@ LrWpanTschHelper::AddSlotframe(Ptr<NetDevice> dev, uint8_t slotframehandle, uint
   slotframeRequest.slotframeHandle = slotframehandle;
   slotframeRequest.Operation = MlmeSlotframeOperation_ADD;
   slotframeRequest.size = size;
-  dev->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetSlotframeRequest (slotframeRequest);
+  dev->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetSlotframeRequest (slotframeRequest);
 }
 
 void
@@ -728,7 +799,7 @@ LrWpanTschHelper::ModSlotframe(NetDeviceContainer devs, uint8_t slotframehandle,
   for (NetDeviceContainer::Iterator i = devs.Begin (); i != devs.End (); i++)
     {
       Ptr<LrWpanTschNetDevice> lrDevice = DynamicCast<LrWpanTschNetDevice> (*i);
-      lrDevice->GetMac ()->MlmeSetSlotframeRequest (slotframeRequest);
+      lrDevice->GetNMac()->MlmeSetSlotframeRequest (slotframeRequest);
     }
 }
 
@@ -749,14 +820,14 @@ LrWpanTschHelper::AddLink(Ptr<NetDevice> src, Ptr<NetDevice> dst, AddLinkParams 
   linkRequest.linkOptions.set(0,1);
   linkRequest.linkType = MlmeSetLinkRequestlinkType_NORMAL;
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(dst->GetAddress());
-  src->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  src->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 
   //01010000 to receive
   linkRequest.linkOptions.reset();
   linkRequest.linkOptions.set(1,1);
   linkRequest.linkOptions.set(3,1);
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(src->GetAddress());
-  dst->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  dst->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 }
 
 void
@@ -770,7 +841,6 @@ LrWpanTschHelper::AddLink(NetDeviceContainer devs, u_int32_t srcPos, u_int32_t d
   linkRequest.Timeslot = params.timeslot;
   linkRequest.ChannelOffset = params.channelOffset;
 
-
   //10000000 to transmit
   linkRequest.linkOptions.reset();
   linkRequest.linkOptions.set(0,1);
@@ -779,22 +849,20 @@ LrWpanTschHelper::AddLink(NetDeviceContainer devs, u_int32_t srcPos, u_int32_t d
   }
   linkRequest.linkType = MlmeSetLinkRequestlinkType_NORMAL;
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(devs.Get(dstPos)->GetAddress());
-  //PK: XXX
   linkRequest.linkFadingBias = FadingBias[dstPos][srcPos];
   linkRequest.TxID = srcPos;
   linkRequest.RxID = dstPos;
-  devs.Get(srcPos)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  devs.Get(srcPos)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 
   //01010000 to receive
   linkRequest.linkOptions.reset();
   linkRequest.linkOptions.set(1,1);
   linkRequest.linkOptions.set(3,1);
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(devs.Get(srcPos)->GetAddress());
-  //PK: XXX
   linkRequest.linkFadingBias = FadingBias[dstPos][srcPos];
   linkRequest.TxID = srcPos;
   linkRequest.RxID = dstPos;
-  devs.Get(dstPos)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  devs.Get(dstPos)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 }
 
 void
@@ -817,7 +885,7 @@ LrWpanTschHelper::AddAdvLink(NetDeviceContainer devs,u_int32_t senderPos, AddLin
   linkRequest.linkFadingBias = NULL;
   linkRequest.TxID = senderPos;
   linkRequest.RxID = 0;
-  devs.Get(senderPos)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  devs.Get(senderPos)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 
   //01010000 to receive
   linkRequest.linkOptions.reset();
@@ -825,19 +893,16 @@ LrWpanTschHelper::AddAdvLink(NetDeviceContainer devs,u_int32_t senderPos, AddLin
   linkRequest.linkOptions.set(3,1);
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(devs.Get(senderPos)->GetAddress());
   for ( u_int32_t i = 0;i < devs.GetN ();i++)
-    {
       if (i != senderPos)
         {
           linkRequest.linkFadingBias = FadingBias[i][senderPos];
           linkRequest.TxID = senderPos;
           linkRequest.RxID = i;
-          devs.Get(i)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+          devs.Get(i)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
         }
-    }
 }
 
-#if 1
-void LrWpanTschHelper::AddBcastLinks(NetDeviceContainer devs,AddLinkParams params)
+void LrWpanTschHelper::AddBcastLinks(NetDeviceContainer devs,u_int32_t coordinatorPos, AddLinkParams params)
 {
   MlmeSetLinkRequestParams linkRequest;
   linkRequest.Operation = MlmeSetLinkRequestOperation_ADD_LINK;
@@ -856,8 +921,9 @@ void LrWpanTschHelper::AddBcastLinks(NetDeviceContainer devs,AddLinkParams param
   for ( u_int32_t i = 0;i < devs.GetN ();i++)
     {
           linkRequest.TxID = i;
-          linkRequest.RxID = 0;
-          devs.Get(i)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+          linkRequest.RxID = coordinatorPos;
+          linkRequest.linkFadingBias = FadingBias[coordinatorPos][i];
+          devs.Get(i)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
     }
 
   //01010000 to receive
@@ -868,12 +934,12 @@ void LrWpanTschHelper::AddBcastLinks(NetDeviceContainer devs,AddLinkParams param
   linkRequest.nodeAddr = Mac16Address("ff:ff");
   for ( u_int32_t i = 0;i < devs.GetN ();i++)
     {
-          linkRequest.TxID = 0;
+          linkRequest.TxID = coordinatorPos;
           linkRequest.RxID = i;
-          devs.Get(i)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+          linkRequest.linkFadingBias = FadingBias[i][coordinatorPos];
+          devs.Get(i)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
     }
 }
-#endif
 
 void
 LrWpanTschHelper::ModifyLink(Ptr<NetDevice> src, Ptr<NetDevice> dst, AddLinkParams params)
@@ -891,14 +957,14 @@ LrWpanTschHelper::ModifyLink(Ptr<NetDevice> src, Ptr<NetDevice> dst, AddLinkPara
   linkRequest.linkOptions.set(0,1);
   linkRequest.linkType = MlmeSetLinkRequestlinkType_NORMAL;
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(dst->GetAddress());
-  src->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  src->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 
   //01010000 to receive
   linkRequest.linkOptions.reset();
   linkRequest.linkOptions.set(1,1);
   linkRequest.linkOptions.set(3,1);
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(src->GetAddress());
-  dst->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  dst->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 }
 
 void
@@ -923,7 +989,7 @@ LrWpanTschHelper::ModifyLink(NetDeviceContainer devs, u_int32_t srcPos, u_int32_
   linkRequest.linkFadingBias = FadingBias[dstPos][srcPos];
   linkRequest.TxID = srcPos;
   linkRequest.RxID = dstPos;
-  devs.Get(srcPos)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  devs.Get(srcPos)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 
   //01010000 to receive
   linkRequest.linkOptions.reset();
@@ -933,7 +999,7 @@ LrWpanTschHelper::ModifyLink(NetDeviceContainer devs, u_int32_t srcPos, u_int32_
   linkRequest.linkFadingBias = FadingBias[dstPos][srcPos];
   linkRequest.TxID = srcPos;
   linkRequest.RxID = dstPos;
-  devs.Get(dstPos)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  devs.Get(dstPos)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 }
 
 void
@@ -953,14 +1019,14 @@ LrWpanTschHelper::DeleteLink(Ptr<NetDevice> src, Ptr<NetDevice> dst, AddLinkPara
   linkRequest.linkOptions.set(0,1);
   linkRequest.linkType = MlmeSetLinkRequestlinkType_NORMAL;
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(dst->GetAddress());
-  src->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  src->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 
   //01010000 to receive
   linkRequest.linkOptions.reset();
   linkRequest.linkOptions.set(1,1);
   linkRequest.linkOptions.set(3,1);
   linkRequest.nodeAddr = Mac16Address::ConvertFrom(src->GetAddress());
-  dst->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  dst->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 }
 
 void
@@ -986,7 +1052,7 @@ LrWpanTschHelper::DeleteLink(NetDeviceContainer devs, u_int32_t srcPos, u_int32_
   linkRequest.linkFadingBias = FadingBias[dstPos][srcPos];
   linkRequest.TxID = srcPos;
   linkRequest.RxID = dstPos;
-  devs.Get(srcPos)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  devs.Get(srcPos)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 
   //01010000 to receive
   linkRequest.linkOptions.reset();
@@ -996,14 +1062,13 @@ LrWpanTschHelper::DeleteLink(NetDeviceContainer devs, u_int32_t srcPos, u_int32_
   linkRequest.linkFadingBias = FadingBias[dstPos][srcPos];
   linkRequest.TxID = srcPos;
   linkRequest.RxID = dstPos;
-  devs.Get(dstPos)->GetObject<LrWpanTschNetDevice> ()->GetMac ()->MlmeSetLinkRequest (linkRequest);
+  devs.Get(dstPos)->GetObject<LrWpanTschNetDevice> ()->GetNMac()->MlmeSetLinkRequest (linkRequest);
 }
 
 void
-LrWpanTschHelper::ConfigureSlotframeAllToPan(NetDeviceContainer devs, int empty_timeslots)
+LrWpanTschHelper::ConfigureSlotframeAllToPan(NetDeviceContainer devs, int empty_timeslots, bool bidir, bool bcast)
 {
-  //DynamicCast<LrWpanTschNetDevice> (netdev.Get(i))
-  int size = 1 + devs.GetN () + empty_timeslots - 1;
+  int size = (bcast ? 2 : 1) + (bidir ? 2 : 1)*(devs.GetN ()-1) + empty_timeslots;
 
   AddSlotframe(devs,m_slotframehandle,size);
 
@@ -1016,15 +1081,27 @@ LrWpanTschHelper::ConfigureSlotframeAllToPan(NetDeviceContainer devs, int empty_
   alparams.timeslot = 0;
   AddAdvLink (devs,0,alparams);
 
-  alparams.linkHandle = 1;
-  alparams.timeslot = 1;
-  AddBcastLinks (devs,alparams);
+  if (bcast) {
+	  alparams.linkHandle = 1;
+	  alparams.timeslot = 1;
+	  AddBcastLinks (devs,0,alparams);
+  }
 
-  for (u_int32_t i = 0; i < devs.GetN ()-1 ; i++)
+  uint16_t c=(bcast ? 2 : 1);
+
+  for (u_int32_t i = 0; i < devs.GetN ()-1; i++,c++)
     {
-      alparams.linkHandle = i+2;
-      alparams.timeslot = i+2;
-      AddLink (DynamicCast<LrWpanTschNetDevice> (devs.Get (i+1)),DynamicCast<LrWpanTschNetDevice> (devs.Get (0)),alparams);
+      alparams.linkHandle = c;
+      alparams.timeslot = c;
+      AddLink(devs,i+1,0,alparams,false);
+    }
+
+  if (bidir)
+    for (u_int32_t i = 0; i < devs.GetN ()-1; i++,c++)
+    {
+      alparams.linkHandle = c;
+      alparams.timeslot = c;
+      AddLink(devs,0,i+1,alparams,false);
     }
    m_slotframehandle++;
 }
@@ -1032,15 +1109,20 @@ LrWpanTschHelper::ConfigureSlotframeAllToPan(NetDeviceContainer devs, int empty_
 void
 LrWpanTschHelper::EnableTsch(NetDeviceContainer devs, double start, double duration)
 {
+  /*
   MlmeTschModeRequestParams modeRequest,modeRequestoff;
   modeRequest.TSCHMode = MlmeTschMode_ON;
   modeRequestoff.TSCHMode = MlmeTschMode_OFF;
+  */
 
   for (u_int32_t i = 0;i<devs.GetN ();i++)
     {
-      Simulator::Schedule(Seconds(start),&LrWpanTschMac::MlmeTschModeRequest,devs.Get (i)->GetObject<LrWpanTschNetDevice> ()->GetMac(),modeRequest);
+      Simulator::Schedule(Seconds(start),
+      	&LrWpanTschNetDevice::SetTschMode,devs.Get (i)->GetObject<LrWpanTschNetDevice> (),
+	true);
       Simulator::Schedule(Seconds(start+duration),
-                          &LrWpanTschMac::MlmeTschModeRequest,devs.Get (i)->GetObject<LrWpanTschNetDevice> ()->GetMac(),modeRequestoff);
+      	&LrWpanTschNetDevice::SetTschMode,devs.Get (i)->GetObject<LrWpanTschNetDevice> (),
+	false);
     }
 }
 
