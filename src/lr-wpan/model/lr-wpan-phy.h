@@ -18,6 +18,8 @@
  * Author:
  *  Gary Pei <guangyu.pei@boeing.com>
  *  Sascha Alexander Jopen <jopen@cs.uni-bonn.de>
+ *  Peishuo Li <pressthunder@gmail.com>
+ *  Pjotr Kourzanov <peter.kourzanov@xs4all.nl> 
  */
 #ifndef LR_WPAN_PHY_H
 #define LR_WPAN_PHY_H
@@ -116,7 +118,11 @@ typedef enum
   IEEE_802_15_4_PHY_TX_ON = 0x09,
   IEEE_802_15_4_PHY_UNSUPPORTED_ATTRIBUTE = 0xa,
   IEEE_802_15_4_PHY_READ_ONLY = 0xb,
-  IEEE_802_15_4_PHY_UNSPECIFIED = 0xc // all cases not covered by ieee802.15.4
+  IEEE_802_15_4_PHY_UNSPECIFIED = 0xc,
+  // all cases not covered by ieee802.15.4
+
+  IEEE_802_15_4_PHY_TRX_START = 0xd,
+  IEEE_802_15_4_PHY_TRX_SWITCHING = 0xe
 } LrWpanPhyEnumeration;
 
 namespace TracedValueCallback
@@ -149,6 +155,13 @@ typedef enum
   phySymbolsPerOctet = 0x07
 } LrWpanPibAttributeIdentifier;
 
+typedef enum
+{
+  IEEE_802_15_4_PPDU_PAYLOAD        = 0,
+  IEEE_802_15_4_PPDU_SHR            = 1,
+  IEEE_802_15_4_PPDU_PHR            = 2,
+} LrWpanPPDU;
+
 /**
  * \ingroup lr-wpan
  *
@@ -164,6 +177,7 @@ typedef struct
   uint32_t phyMaxFrameDuration;      //!< The maximum number of symbols in a frame
   uint32_t phySHRDuration;           //!< The duration of the synchronization header (SHR) in symbols
   double phySymbolsPerOctet;         //!< The number of symbols per octet
+  double phyLinkFadingBias;
 } LrWpanPhyPibAttributes;
 
 /**
@@ -489,6 +503,7 @@ public:
   typedef void (* StateTracedCallback)
     (Time time, LrWpanPhyEnumeration oldState, LrWpanPhyEnumeration newState);
 
+  void HandleEnergyDepletion ();
 protected:
   /**
    * The data and symbol rates for the different PHY options.
@@ -541,8 +556,11 @@ private:
   /**
    * Check if the interference destroys a frame currently received. Called
    * whenever a change in interference is detected.
+   * param packetType: 0: SHR (preamble and SFD) is transmitting
+   *                   1: PHR is transmitting
+   *                   2: PHY Payload is transmitting
    */
-  void CheckInterference (void);
+  void CheckInterference (LrWpanPPDU packetType, Ptr<LrWpanSpectrumSignalParameters> spectrumRxParams);
 
   /**
    * Finish the reception of a frame. This is called at the end of a frame
@@ -554,7 +572,7 @@ private:
    *
    * \param params signal parameters of the packet
    */
-  void EndRx (Ptr<SpectrumSignalParameters> params);
+  void EndRx (Ptr<LrWpanSpectrumSignalParameters> params);
 
   /**
    * Cancel an ongoing ED procedure. This is called when the transceiver is
@@ -598,6 +616,12 @@ private:
    * \returns The time required for sending the PPDU header.
    */
   Time GetPpduHeaderTxTime (void);
+
+  /**
+   * Calculate the time required for sending the SHR of PPDU header, that is the
+   * preamble and SFD.
+   */
+  Time GetSHRTxTime(void);
 
   /**
    * Check if the given channel is supported by the PHY.
@@ -672,6 +696,8 @@ private:
    * be removed in a future release.
    */
   TracedCallback<Time, LrWpanPhyEnumeration, LrWpanPhyEnumeration> m_trxStateLogger;
+
+  TracedCallback<double> m_phyLinkInformation;
 
   /**
    * The mobility model used by the PHY.
@@ -788,6 +814,8 @@ private:
    */
   double m_rxSensitivity;
 
+  double m_receivedPower;
+
   /**
    * The accumulated signals currently received by the transceiver, including
    * the signal of a possibly received packet, as well as all signals
@@ -799,6 +827,7 @@ private:
    * Timestamp of the last calculation of the PER of a packet currently received.
    */
   Time m_rxLastUpdate;
+  Time m_currentPacketRxStart;
 
   /**
    * Statusinformation of the currently received packet. The first parameter
@@ -831,6 +860,8 @@ private:
    */
   EventId m_setTRXState;
 
+  EventId m_endRx;
+
   /**
    * Scheduler event of a currently running data transmission request.
    */
@@ -840,6 +871,9 @@ private:
    * Uniform random variable stream.
    */
   Ptr<UniformRandomVariable> m_random;
+
+  Ptr<UniformRandomVariable> m_randomdatalength;
+  
 };
 
 

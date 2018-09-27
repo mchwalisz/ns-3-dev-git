@@ -15,3 +15,9 @@ def build(bld):
 
     obj = bld.create_ns3_program('lr-wpan-error-distance-plot', ['lr-wpan', 'stats'])
     obj.source = 'lr-wpan-error-distance-plot.cc'
+
+    obj = bld.create_ns3_program('lr-wpan-rich', ['lr-wpan','sixlowpan','internet','mobility','applications'])
+    obj.source = 'lr-wpan-rich.cc'
+
+    obj = bld.create_ns3_program('lr-wpan-ping', ['lr-wpan','sixlowpan','internet','mobility','applications'])
+    obj.source = 'lr-wpan-ping.cc'

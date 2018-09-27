@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  *  Author: kwong yin <kwong-sang.yin@boeing.com>
+ *          Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
  */
 
 /*
@@ -64,6 +65,8 @@ public:
     LRWPAN_MAC_DATA = 1,          //!< LRWPAN_MAC_DATA
     LRWPAN_MAC_ACKNOWLEDGMENT = 2,//!< LRWPAN_MAC_ACKNOWLEDGMENT
     LRWPAN_MAC_COMMAND = 3,       //!< LRWPAN_MAC_COMMAND
+    LRWPAN_MAC_LLDN = 4,          //!< LRWPAN_MAC_LLDN
+    LRWPAN_MAC_MULTIPURPOSE = 5,  //!< LRWPAN_MAC_MULTIPURPOSE
     LRWPAN_MAC_RESERVED           //!< LRWPAN_MAC_RESERVED
   };
 
@@ -88,6 +91,22 @@ public:
     SHORTKEYSOURCE = 2,
     LONGKEYSOURCE = 3
   };
+
+  //Table 3a—Possible values of the Frame Version field
+  enum FrameVersionType {
+    IEEE_802_15_4_2003 = 0,
+    IEEE_802_15_4_2006 = 1,
+    IEEE_802_15_4 = 2,
+    FRAME_VERSION_RESERVED = 4
+  };
+
+  //Information Elements
+  typedef struct {
+    uint8_t length; //7 bits
+    uint8_t id; //8 bits
+    bool type; //always 0
+    std::vector<uint8_t> content; //0-127 bytes
+  }HeaderIE;
 
   LrWpanMacHeader (void);
 
@@ -407,6 +426,8 @@ public:
    * \param keyIndex the Key index
    */
   void SetKeyId (uint32_t keySrc, uint8_t keyIndex);
+
+
   /**
    * Set the Key Index and originator
    * \param keySrc the originator of a group key
@@ -418,14 +439,29 @@ public:
    * \brief Get the type ID.
    * \return the object TypeId
    */
+  std::string GetName (void) const;
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
-
+  void PrintFrameControl (std::ostream &os) const;
   void Print (std::ostream &os) const;
   uint32_t GetSerializedSize (void) const;
   void Serialize (Buffer::Iterator start) const;
   uint32_t Deserialize (Buffer::Iterator start);
 
+
+  //802.15.4e support
+  void SetHeaderIE(HeaderIE ie);
+  void SetIEField();
+  void SetNoIEField();
+  void SetSeqNumSup();
+  void SetNoSeqNumSup();
+  bool IsIEListPresent(void) const;
+  bool IsSeqNumSup (void) const;
+  bool IsNoSeqNumSup (void) const;
+  std::list<HeaderIE> GetIEList(void) const;
+  void NewAckIE(uint16_t);
+  void EndNoPayloadIE();
+  void EndPayloadIE();
 
 private:
   /* Frame Control 2 Octets */
@@ -435,7 +471,9 @@ private:
   uint8_t m_fctrlFrmPending;            //!< Frame Control field Bit 4
   uint8_t m_fctrlAckReq;                //!< Frame Control field Bit 5
   uint8_t m_fctrlPanIdComp;             //!< Frame Control field Bit 6      = 0 - no compression, 1 - using only DstPanId for both Src and DstPanId
-  uint8_t m_fctrlReserved;              //!< Frame Control field Bit 7-9
+  uint8_t m_fctrlReserved;              //!< Frame Control field Bit 7
+  uint8_t m_fctrlSeqNumSuppression;     //!< Frame Control field Bit 8      = 0 - seq number present, 1 - no seq number
+  uint8_t m_fctrlIEListPresent;         //!< Frame Control field Bit 9      = 0 - no IE List, 1 - IE List present
   uint8_t m_fctrlDstAddrMode;           //!< Frame Control field Bit 10-11  = 0 - No DstAddr, 2 - ShtDstAddr, 3 - ExtDstAddr
   uint8_t m_fctrlFrmVer;                //!< Frame Control field Bit 12-13
   uint8_t m_fctrlSrcAddrMode;           //!< Frame Control field Bit 14-15  = 0 - No SrcAddr, 2 - ShtSrcAddr, 3 - ExtSrcAddr
@@ -473,6 +511,9 @@ private:
   }; //!< Auxiliary security header
 
   uint8_t m_auxKeyIdKeyIndex;           //!< Auxiliary security header - Key Index (1 Octet)
+
+  
+  std::list<HeaderIE> headerie; //IE Header List
 
 }; //LrWpanMacHeader
 

@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: kwong yin <kwong-sang.yin@boeing.com>
+ *         Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
  */
 #include "lr-wpan-mac-header.h"
 #include <ns3/address-utils.h>
@@ -37,6 +38,7 @@ LrWpanMacHeader::LrWpanMacHeader ()
   SetDstAddrMode (NOADDR);       // Assume there will be no src and dst address
   SetSrcAddrMode (NOADDR);
   SetFrameVer (1);               //Indicates an IEEE 802.15.4 frame
+  SetNoSeqNumSup();              //No supression of the sequence number
 }
 
 
@@ -78,6 +80,12 @@ LrWpanMacHeader::GetType (void) const
     case 3:
       return LRWPAN_MAC_COMMAND;
       break;
+    case 4:
+      return LRWPAN_MAC_LLDN;
+      break;
+    case 5:
+      return LRWPAN_MAC_MULTIPURPOSE;
+      break;
     default:
       return LRWPAN_MAC_RESERVED;
     }
@@ -95,10 +103,21 @@ LrWpanMacHeader::GetFrameControl (void) const
   val |= (m_fctrlFrmPending << 4) & (0x01 << 4);   // Bit 4
   val |= (m_fctrlAckReq << 5) & (0x01 << 5);        // Bit 5
   val |= (m_fctrlPanIdComp << 6) & (0x01 << 6);    // Bit 6
-  val |= (m_fctrlReserved << 7) & (0x07 << 7);     // Bit 7-9
+
+
   val |= (m_fctrlDstAddrMode << 10) & (0x03 << 10); // Bit 10-11
   val |= (m_fctrlFrmVer << 12) & (0x03 << 12);     // Bit 12-13
   val |= (m_fctrlSrcAddrMode << 14) & (0x03 << 14); // Bit 14-15
+
+  //802.15.4e
+  if (m_fctrlFrmVer == 2) {
+
+    val |= (m_fctrlReserved << 7) & (0x01 << 7);          // Bit 7
+    val |= (m_fctrlSeqNumSuppression << 8) & (0x01 << 8);          // Bit 8
+    val |= (m_fctrlIEListPresent << 9) & (0x01 << 9);          // Bit 9
+  } else {
+    val |= (m_fctrlReserved << 7) & (0x07 << 7);           // Bit 7-9
+  }
   return val;
 
 }
@@ -300,10 +319,23 @@ LrWpanMacHeader::SetFrameControl (uint16_t frameControl)
   m_fctrlFrmPending = (frameControl >> 4) & (0x01);     // Bit 4
   m_fctrlAckReq = (frameControl >> 5) & (0x01);         // Bit 5
   m_fctrlPanIdComp = (frameControl >> 6) & (0x01);      // Bit 6
-  m_fctrlReserved = (frameControl >> 7) & (0x07);       // Bit 7-9
+
+
+
   m_fctrlDstAddrMode = (frameControl >> 10) & (0x03);   // Bit 10-11
   m_fctrlFrmVer = (frameControl >> 12) & (0x03);        // Bit 12-13
   m_fctrlSrcAddrMode = (frameControl >> 14) & (0x03);   // Bit 14-15
+
+
+  if (m_fctrlFrmVer == 2)
+    {
+      //802.15.4e
+      m_fctrlReserved = (frameControl >> 7) & (0x01);          // Bit 7
+      m_fctrlSeqNumSuppression = (frameControl >> 8) & (0x01);          // Bit 8
+      m_fctrlIEListPresent = (frameControl >> 9) & (0x01);          // Bit 9
+    } else {
+      m_fctrlReserved = (frameControl >> 7) & (0x07);             // Bit 7-9
+    }
 }
 
 
@@ -480,6 +512,13 @@ LrWpanMacHeader::SetKeyId (uint64_t keySrc,
   m_auxKeyIdKeySrc64 = keySrc;
 }
 
+
+std::string
+LrWpanMacHeader::GetName (void) const
+{
+  return "LrWpan MAC Header";
+}
+
 TypeId
 LrWpanMacHeader::GetTypeId (void)
 {
@@ -490,6 +529,7 @@ LrWpanMacHeader::GetTypeId (void)
   return tid;
 }
 
+
 TypeId
 LrWpanMacHeader::GetInstanceTypeId (void) const
 {
@@ -497,41 +537,151 @@ LrWpanMacHeader::GetInstanceTypeId (void) const
 }
 
 void
-LrWpanMacHeader::Print (std::ostream &os) const
+LrWpanMacHeader::PrintFrameControl (std::ostream &os) const
 {
-  os << "  Frame Type = " << (uint32_t) m_fctrlFrmType << ", Sec Enable = " << (uint32_t) m_fctrlSecU
+  os << "Frame Type = " << (uint32_t) m_fctrlFrmType << ", Sec Enable = " << (uint32_t) m_fctrlSecU
      << ", Frame Pending = " << (uint32_t) m_fctrlFrmPending << ", Ack Request = " << (uint32_t) m_fctrlAckReq
-     << ", PAN ID Compress = " << (uint32_t) m_fctrlPanIdComp << ", Frame Vers = " << (uint32_t) m_fctrlFrmVer
-     << ", Dst Addrs Mode = " << (uint32_t) m_fctrlDstAddrMode << ", Src Addr Mode = " << (uint32_t) m_fctrlSrcAddrMode;
+     << ", PAN ID Compress = " << (uint32_t) m_fctrlPanIdComp;
 
-  os << ", Sequence Num = " << static_cast<uint16_t> (m_SeqNum);
-
-  switch (m_fctrlDstAddrMode)
+  if (m_fctrlFrmVer == 2)
     {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      os << ", Dst Addr Pan ID = " << static_cast<uint16_t> (m_addrDstPanId)
-         << ", m_addrShortDstAddr = " << m_addrShortDstAddr;
-      break;
-    case EXTADDR:
-      os << ", Dst Addr Pan ID = " << static_cast<uint16_t> (m_addrDstPanId)
-         << ", m_addrExtDstAddr = " << m_addrExtDstAddr;
-      break;
+      os << ", SeqNum Supression = "  << (uint32_t) m_fctrlSeqNumSuppression <<  ", IE List Present = " <<  (uint32_t) m_fctrlIEListPresent;
     }
 
-  switch (m_fctrlSrcAddrMode)
+  os << ", Dst Addrs Mode = " << (uint32_t) m_fctrlDstAddrMode
+     << ", Frame Vers = " << (uint32_t) m_fctrlFrmVer << ", Src Addr Mode = " << (uint32_t) m_fctrlSrcAddrMode;
+}
+
+void
+LrWpanMacHeader::Print (std::ostream &os) const
+{
+  PrintFrameControl (os);
+  //os << std::endl;
+  if (m_fctrlFrmVer != 2 || m_fctrlSeqNumSuppression == 0) {
+    os << ", Sequence Num = " << static_cast<uint16_t> (m_SeqNum);
+  }
+
+  //802.15.4
+  if (m_fctrlFrmVer == 2)
     {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      os << ", Src Addr Pan ID = " << static_cast<uint16_t> (m_addrSrcPanId)
-         << ", m_addrShortSrcAddr = " << m_addrShortSrcAddr;
-      break;
-    case EXTADDR:
-      os << ", Src Addr Pan ID = " << static_cast<uint32_t> (m_addrSrcPanId)
-         << ", m_addrExtSrcAddr = " << m_addrExtDstAddr;
-      break;
+    if (m_fctrlPanIdComp == 0)
+      {
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                os << ", Src Addr Pan ID = " << static_cast<uint16_t> (m_addrSrcPanId);
+
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    os << ", m_addrShortSrcAddr = " << m_addrShortSrcAddr;
+                  }
+                else
+                  {
+                    os << ", m_addrExtSrcAddr = " << m_addrExtDstAddr;
+                  }
+              }
+          }
+        else
+          {
+            os << ", Dst Addr Pan ID = " << static_cast<uint16_t> (m_addrDstPanId);
+
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                os << ", m_addrShortDstAddr = " << m_addrShortDstAddr;
+              }
+            else
+              {
+                os << ", m_addrExtDstAddr = " << m_addrExtDstAddr;
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    os << ", m_addrShortSrcAddr = " << m_addrShortSrcAddr;
+                  }
+                else
+                  {
+                    os << ", m_addrExtSrcAddr = " << m_addrExtDstAddr;
+                  }
+              }
+          }
+        }
+      else
+        {
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    os << ", m_addrShortSrcAddr = " << m_addrShortSrcAddr;
+                  }
+                else
+                  {
+                    os << ", m_addrExtSrcAddr = " << m_addrExtDstAddr;
+                  }
+              }
+            else
+              {
+                 os << ", Dst Addr Pan ID = " << static_cast<uint16_t> (m_addrDstPanId);
+              }
+          }
+        else
+          {
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                os << ", m_addrShortSrcAddr = " << m_addrShortSrcAddr;
+              }
+            else
+              {
+                os << ", m_addrExtDstAddr = " << m_addrExtDstAddr;
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    os << ", m_addrShortSrcAddr = " << m_addrShortSrcAddr;
+                  }
+                else
+                  {
+                    os << ", m_addrExtSrcAddr = " << m_addrExtDstAddr;
+                  }
+              }
+          }
+      }
+    }
+  else
+    {
+      switch (m_fctrlDstAddrMode)
+        {
+        case NOADDR:
+          break;
+        case SHORTADDR:
+          os << ", Dst Addr Pan ID = " << static_cast<uint16_t> (m_addrDstPanId)
+             << ", m_addrShortDstAddr = " << m_addrShortDstAddr;
+          break;
+        case EXTADDR:
+          os << ", Dst Addr Pan ID = " << static_cast<uint16_t> (m_addrDstPanId)
+             << ", m_addrExtDstAddr = " << m_addrExtDstAddr;
+          break;
+        }
+
+      switch (m_fctrlSrcAddrMode)
+        {
+        case NOADDR:
+          break;
+        case SHORTADDR:
+          os << ", Src Addr Pan ID = " << static_cast<uint16_t> (m_addrSrcPanId)
+             << ", m_addrShortSrcAddr = " << m_addrShortSrcAddr;
+          break;
+        case EXTADDR:
+          os << ", Src Addr Pan ID = " << static_cast<uint32_t> (m_addrSrcPanId)
+             << ", m_addrExtSrcAddr = " << m_addrExtDstAddr;
+          break;
+        }
     }
 
   if (IsSecEnable ())
@@ -557,6 +707,24 @@ LrWpanMacHeader::Print (std::ostream &os) const
           break;
         }
     }
+
+  if (m_fctrlIEListPresent == 1) {
+    os << " IE List: ";
+
+    for (std::list<HeaderIE>::const_iterator it = headerie.begin();it!=headerie.end();it++) {
+
+      os << "Lenght = " << (uint32_t) it->length
+         << ", Type = " << (uint32_t) it->type
+         << ", ID = " << (uint32_t)  it->id;
+
+      os << ", Data: ";
+      for (std::vector<uint8_t>::const_iterator it2 = it->content.begin();it2!=it->content.end();it2++) {
+        os << static_cast<uint32_t>(*it2);
+      }
+      os << "; ";
+      
+    }
+  }
 }
 
 uint32_t
@@ -565,56 +733,154 @@ LrWpanMacHeader::GetSerializedSize (void) const
   /*
    * Each mac header will have
    * Frame Control      : 2 octet
-   * Sequence Number    : 1 Octet
+   * Sequence Number    : 0/1 Octet
    * Dst PAN Id         : 0/2 Octet
    * Dst Address        : 0/2/8 octet
    * Src PAN Id         : 0/2 octet
    * Src Address        : 0/2/8 octet
    * Aux Sec Header     : 0/5/6/10/14 octet
+   * IE Header          : variable
    */
 
-  uint32_t size = 3;
+  uint32_t size = 2;
 
-  switch (m_fctrlDstAddrMode)
+  if ((m_fctrlSeqNumSuppression == 0 && m_fctrlFrmVer == 2) || m_fctrlFrmVer == 1)
     {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      size += 4;
-      break;
-    case EXTADDR:
-      size += 10;
-      break;
+      size+=1;
     }
 
-  switch (m_fctrlSrcAddrMode)
+  if (m_fctrlFrmVer == 2)
     {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      // check if PAN Id compression is enabled
-      if (!IsPanIdComp ())
+    if (m_fctrlPanIdComp == 0)
+      {
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                size+=2;
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    size+=2;
+                  }
+                else
+                  {
+                    size+=4;
+                  }
+              }
+          }
+        else
+          {
+            size+=2;
+
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                size+=2;
+              }
+            else
+              {
+               size+=4;
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    size+=2;
+                  }
+                else
+                  {
+                    size+=4;
+                  }
+              }
+          }
+        }
+      else
         {
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    size+=2;
+                  }
+                else
+                  {
+                    size+=4;
+                  }
+              }
+            else
+              {
+                 size+=2;
+              }
+          }
+        else
+          {
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                size+=2;
+              }
+            else
+              {
+                size+=4;
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    size+=2;
+                  }
+                else
+                  {
+                    size+=4;
+                  }
+              }
+          }
+      }
+    }
+  else
+    {
+      switch (m_fctrlDstAddrMode)
+        {
+        case NOADDR:
+          break;
+        case SHORTADDR:
           size += 4;
-        }
-      else
-        {
-          size += 2;
-        }
-      break;
-    case EXTADDR:
-      // check if PAN Id compression is enabled
-      if (!IsPanIdComp ())
-        {
+          break;
+        case EXTADDR:
           size += 10;
+          break;
         }
-      else
-        {
-          size += 8;
-        }
-      break;
-    }
 
+      switch (m_fctrlSrcAddrMode)
+        {
+        case NOADDR:
+          break;
+        case SHORTADDR:
+          // check if PAN Id compression is enabled
+          if (!IsPanIdComp ())
+            {
+              size += 4;
+            }
+          else
+            {
+              size += 2;
+            }
+          break;
+        case EXTADDR:
+          // check if PAN Id compression is enabled
+          if (!IsPanIdComp ())
+            {
+              size += 10;
+            }
+          else
+            {
+              size += 8;
+            }
+          break;
+        }
+    }
 
   // check if security is enabled
   if (IsSecEnable ())
@@ -635,6 +901,13 @@ LrWpanMacHeader::GetSerializedSize (void) const
           break;
         }
     }
+
+  if (m_fctrlIEListPresent == 1 && m_fctrlFrmVer == 2) {
+    for (std::list<HeaderIE>::const_iterator it = headerie.begin() ; it != headerie.end() ; it++) {
+      size+=it->length + 2;
+    }
+  }
+
   return (size);
 }
 
@@ -646,40 +919,137 @@ LrWpanMacHeader::Serialize (Buffer::Iterator start) const
   uint16_t frameControl = GetFrameControl ();
 
   i.WriteHtolsbU16 (frameControl);
-  i.WriteU8 (GetSeqNum ());
 
-  switch (m_fctrlDstAddrMode)
+  if ((m_fctrlSeqNumSuppression == 0 || m_fctrlFrmVer!=2) || m_fctrlFrmVer == 1) {
+    i.WriteU8 (GetSeqNum ());
+  }
+
+  //802.15.4
+  if (m_fctrlFrmVer == 2)
     {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      i.WriteHtolsbU16 (GetDstPanId ());
-      WriteTo (i, m_addrShortDstAddr);
-      break;
-    case EXTADDR:
-      i.WriteHtolsbU16 (GetDstPanId ());
-      WriteTo (i, m_addrExtDstAddr);
-      break;
+    if (m_fctrlPanIdComp == 0)
+      {
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                i.WriteHtolsbU16 (GetSrcPanId ());
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    WriteTo (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    WriteTo (i, m_addrExtSrcAddr);
+                  }
+              }
+          }
+        else
+          {
+            i.WriteHtolsbU16 (GetDstPanId ());
+
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                WriteTo (i, m_addrShortDstAddr);
+              }
+            else
+              {
+                WriteTo (i, m_addrExtDstAddr);
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    WriteTo (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    WriteTo (i, m_addrExtSrcAddr);
+                  }
+              }
+          }
+        }
+      else
+        {
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    WriteTo (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    WriteTo (i, m_addrExtSrcAddr);
+                  }
+              }
+            else
+              {
+                 i.WriteHtolsbU16 (GetDstPanId ());
+              }
+          }
+        else
+          {
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                WriteTo (i, m_addrShortDstAddr);
+              }
+            else
+              {
+                WriteTo (i, m_addrExtDstAddr);
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    WriteTo (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    WriteTo (i, m_addrExtSrcAddr);
+                  }
+              }
+          }
+      }
     }
-
-  switch (m_fctrlSrcAddrMode)
+  else
     {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      if (!IsPanIdComp ())
+      switch (m_fctrlDstAddrMode)
         {
-          i.WriteHtolsbU16 (GetSrcPanId ());
+          case NOADDR:
+            break;
+          case SHORTADDR:
+            i.WriteHtolsbU16 (GetDstPanId ());
+            WriteTo (i, m_addrShortDstAddr);
+            break;
+          case EXTADDR:
+            i.WriteHtolsbU16 (GetDstPanId ());
+            WriteTo (i, m_addrExtDstAddr);
+            break;
         }
-      WriteTo (i, m_addrShortSrcAddr);
-      break;
-    case EXTADDR:
-      if (!IsPanIdComp ())
+
+      switch (m_fctrlSrcAddrMode)
         {
-          i.WriteHtolsbU16 (GetSrcPanId ());
+          case NOADDR:
+            break;
+          case SHORTADDR:
+            if (!IsPanIdComp ())
+              {
+                i.WriteHtolsbU16 (GetSrcPanId ());
+              }
+            WriteTo (i, m_addrShortSrcAddr);
+            break;
+          case EXTADDR:
+            if (!IsPanIdComp ())
+              {
+                i.WriteHtolsbU16 (GetSrcPanId ());
+              }
+            WriteTo (i, m_addrExtSrcAddr);
+            break;
         }
-      WriteTo (i, m_addrExtSrcAddr);
-      break;
     }
 
   if (IsSecEnable ())
@@ -704,6 +1074,22 @@ LrWpanMacHeader::Serialize (Buffer::Iterator start) const
           break;
         }
     }
+
+  if (m_fctrlIEListPresent == 1 && m_fctrlFrmVer == 2) {
+    for (std::list<HeaderIE>::const_iterator it = headerie.begin();it!=headerie.end();it++) {
+      uint16_t desc = 0;
+
+      desc |= (it->length << 9) & (0xfe00); //7bits
+      //desc |= 0x00 ; //1 bit
+      desc |= (it->id << 1) & (0x01fe); //8bits
+          
+      i.WriteHtolsbU16(desc);
+
+      for (uint8_t j = 0; j < it->length ;j++) {
+        i.WriteU8 (it->content[j]);
+      }
+    }
+  }
 }
 
 
@@ -715,53 +1101,150 @@ LrWpanMacHeader::Deserialize (Buffer::Iterator start)
   uint16_t frameControl = i.ReadLsbtohU16 ();
   SetFrameControl (frameControl);
 
-  SetSeqNum (i.ReadU8 ());
-  switch (m_fctrlDstAddrMode)
-    {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      m_addrDstPanId = i.ReadLsbtohU16 ();
-      ReadFrom (i, m_addrShortDstAddr);
-      break;
-    case EXTADDR:
-      m_addrDstPanId = i.ReadLsbtohU16 ();
-      ReadFrom (i, m_addrExtDstAddr);
-      break;
-    }
+  if (m_fctrlSeqNumSuppression == 0 || m_fctrlFrmVer == 1) {
+    SetSeqNum (i.ReadU8 ());
+  }
 
-  switch (m_fctrlSrcAddrMode)
+  //802.15.4
+  if (m_fctrlFrmVer == 2)
     {
-    case NOADDR:
-      break;
-    case SHORTADDR:
-      if (!IsPanIdComp ())
-        {
-          m_addrSrcPanId = i.ReadLsbtohU16 ();
+    if (m_fctrlPanIdComp == 0)
+      {
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                m_addrSrcPanId = i.ReadLsbtohU16 ();
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    ReadFrom (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    ReadFrom (i, m_addrExtSrcAddr);
+                  }
+              }
+          }
+        else
+          {
+            m_addrDstPanId = i.ReadLsbtohU16 ();
+
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                ReadFrom (i, m_addrShortDstAddr);
+              }
+            else
+              {
+                ReadFrom (i, m_addrExtDstAddr);
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    ReadFrom (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    ReadFrom (i, m_addrExtSrcAddr);
+                  }
+              }
+          }
         }
       else
         {
-          if (m_fctrlDstAddrMode > 0)
-            {
-              m_addrSrcPanId = m_addrDstPanId;
-            }
-        }
-      ReadFrom (i, m_addrShortSrcAddr);
-      break;
-    case EXTADDR:
-      if (!IsPanIdComp ())
+        if (m_fctrlDstAddrMode == NOADDR)
+          {
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    ReadFrom (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    ReadFrom (i, m_addrExtSrcAddr);
+                  }
+              }
+            else
+              {
+                 m_addrDstPanId = i.ReadLsbtohU16 ();
+              }
+          }
+        else
+          {
+            if (m_fctrlDstAddrMode == SHORTADDR)
+              {
+                ReadFrom (i, m_addrShortDstAddr);
+              }
+            else
+              {
+                ReadFrom (i, m_addrExtDstAddr);
+              }
+
+            if (m_fctrlSrcAddrMode != NOADDR)
+              {
+                if (m_fctrlSrcAddrMode == SHORTADDR)
+                  {
+                    ReadFrom (i, m_addrShortSrcAddr);
+                  }
+                else
+                  {
+                    ReadFrom (i, m_addrExtSrcAddr);
+                  }
+              }
+          }
+      }
+    }
+  else
+    {
+      switch (m_fctrlDstAddrMode)
         {
-          m_addrSrcPanId = i.ReadLsbtohU16 ();
+        case NOADDR:
+          break;
+        case SHORTADDR:
+          m_addrDstPanId = i.ReadLsbtohU16 ();
+          ReadFrom (i, m_addrShortDstAddr);
+          break;
+        case EXTADDR:
+          m_addrDstPanId = i.ReadLsbtohU16 ();
+          ReadFrom (i, m_addrExtDstAddr);
+          break;
         }
-      else
+
+      switch (m_fctrlSrcAddrMode)
         {
-          if (m_fctrlDstAddrMode > 0)
+        case NOADDR:
+          break;
+        case SHORTADDR:
+          if (!IsPanIdComp ())
             {
-              m_addrSrcPanId = m_addrDstPanId;
+              m_addrSrcPanId = i.ReadLsbtohU16 ();
             }
+          else
+            {
+              if (m_fctrlDstAddrMode > 0)
+                {
+                  m_addrSrcPanId = m_addrDstPanId;
+                }
+            }
+          ReadFrom (i, m_addrShortSrcAddr);
+          break;
+        case EXTADDR:
+          if (!IsPanIdComp ())
+            {
+              m_addrSrcPanId = i.ReadLsbtohU16 ();
+            }
+          else
+            {
+              if (m_fctrlDstAddrMode > 0)
+                {
+                  m_addrSrcPanId = m_addrDstPanId;
+                }
+            }
+          ReadFrom (i, m_addrExtSrcAddr);
+          break;
         }
-      ReadFrom (i, m_addrExtSrcAddr);
-      break;
     }
 
   if (IsSecEnable ())
@@ -784,9 +1267,120 @@ LrWpanMacHeader::Deserialize (Buffer::Iterator start)
           break;
         }
     }
+
+    //802.15.4 IE Header
+    if (m_fctrlFrmVer == 2 && m_fctrlIEListPresent == 1) {
+      uint8_t lastid;
+
+      do {
+        HeaderIE* newie = new HeaderIE;
+        uint16_t head = i.ReadLsbtohU16 ();
+        newie->length = (head >> 9); //7 bits
+        newie->id = (head >> 1); //8bits
+        newie->type = 0; //1bit
+
+        for (int j = 0;j<newie->length ;j++) {
+          newie->content.push_back(i.ReadU8 ());
+        }
+
+        headerie.push_back(*newie);
+        lastid = newie->id;
+
+      } while (lastid != 0x7e && lastid != 0x7f);
+    }
+
   return i.GetDistanceFrom (start);
 }
 
+
+//802.15.4e
+void 
+LrWpanMacHeader::NewAckIE(uint16_t t)
+{
+  HeaderIE ack;
+
+  ack.length = 2;
+  ack.id = 0x1e;
+  ack.type = 0x0;
+
+  ack.content.push_back((t >> (8)) & 0xff);
+  ack.content.push_back(t);
+
+  headerie.push_back(ack);
+}
+
+void
+LrWpanMacHeader::EndNoPayloadIE()
+{
+
+  if (m_fctrlFrmVer == 2) {
+    if (m_fctrlIEListPresent == 1) {
+      HeaderIE endie;
+      endie.id = 0x7f;
+      endie.length = 0;
+
+      headerie.push_back(endie);
+    }
+  }
+}
+
+void
+LrWpanMacHeader::EndPayloadIE() 
+{
+
+  if (m_fctrlFrmVer == 2) {
+    if (m_fctrlIEListPresent == 1) {
+      HeaderIE endie;
+      endie.id = 0x7e;
+      endie.length = 0;
+
+      headerie.push_back(endie);
+    }
+  }
+}
+
+std::list<LrWpanMacHeader::HeaderIE>
+LrWpanMacHeader::GetIEList(void) const
+{
+  return headerie;
+}
+
+bool
+LrWpanMacHeader::IsSeqNumSup (void) const
+{
+  return (m_fctrlSeqNumSuppression == 1);
+}
+
+bool
+LrWpanMacHeader::IsNoSeqNumSup (void) const
+{
+  return (m_fctrlSeqNumSuppression == 0);
+}
+
+void LrWpanMacHeader::SetIEField()
+{
+  m_fctrlIEListPresent = 1;
+}
+
+void LrWpanMacHeader::SetNoIEField()
+{
+  m_fctrlIEListPresent = 0;
+}
+
+void LrWpanMacHeader::SetSeqNumSup()
+{
+  m_fctrlSeqNumSuppression = 1;
+}
+
+void LrWpanMacHeader::SetNoSeqNumSup()
+{
+  m_fctrlSeqNumSuppression = 0;
+}
+
+bool LrWpanMacHeader::IsIEListPresent (void) const
+{
+  return (m_fctrlIEListPresent == 1);
+}
 // ----------------------------------------------------------------------------------------------------------
 
 

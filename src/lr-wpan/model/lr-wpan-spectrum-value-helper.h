@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Gary Pei <guangyu.pei@boeing.com>
+ *         Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
  */
 #ifndef LR_WPAN_SPECTRUM_VALUE_HELPER_H
 #define LR_WPAN_SPECTRUM_VALUE_HELPER_H
@@ -60,6 +61,8 @@ public:
    * \return total power (using composite trap. rule to numerally integrate)
    */
   static double TotalAvgPower (Ptr<const SpectrumValue> psd, uint32_t channel);
+
+  static double CentralAvgPower (Ptr<const SpectrumValue> psd, uint32_t channel);
 
 private:
   /**

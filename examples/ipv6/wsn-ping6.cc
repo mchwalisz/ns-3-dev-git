@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Tommaso Pecorella <tommaso.pecorella@unifi.it>
+ *         Pjotr Kourzanov <peter.kourzanov@xs4all.nl>  Tue, 14 Oct 2014 16:03:14 +0200
  */
 
 // Network topology
@@ -31,6 +32,7 @@
 //
 // This example is based on the "ping6.cc" example.
 
+#include <cassert>
 #include <fstream>
 #include "ns3/core-module.h"
 #include "ns3/internet-module.h"
@@ -42,6 +44,40 @@
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("Ping6WsnExample");
+
+#if TRACING==1
+#include <debugging.h>
+#include "introspect.h"
+extern "C" {
+introspect_t intro = NULL;
+void __cyg_profile_func_enter(void* func, void* site) __attribute__ ((no_instrument_function));
+void __cyg_profile_func_exit(void* func, void* site) __attribute__ ((no_instrument_function));
+void __cyg_profile_func_enter(void* func, void* site)
+{
+	void **frames[]={
+		(void**)__builtin_frame_address(1),
+		(void**)__builtin_frame_address(2)
+	};
+	void *funcs[]={
+		func,
+		site
+	};
+	func_call_aspect(TRACEFILE,intro,frames,funcs,FUNC_ENTER);
+}
+void __cyg_profile_func_exit(void* func, void* site)
+{
+	void **frames[]={
+		(void**)__builtin_frame_address(1),
+		(void**)__builtin_frame_address(2)
+	};
+	void *funcs[]={
+		func,
+		site
+	};
+	func_call_aspect(TRACEFILE,intro,frames,funcs,FUNC_EXIT);
+}
+}
+#endif
 
 int main (int argc, char **argv)
 {
@@ -68,6 +104,14 @@ int main (int argc, char **argv)
   NS_LOG_INFO ("Create nodes.");
   NodeContainer nodes;
   nodes.Create (2);
+
+#if 0
+  intro=introspect_init(argv[0]);
+  //intro=introspect_init("build/libns3-dev-core-debug.so");
+  //intro=introspect_init("build/libns3-dev-lr-wpan-debug.so");
+  assert(intro);
+  introspect_dump(intro);
+#endif
 
   // Set seed for random numbers
   SeedManager::SetSeed (167);
@@ -137,5 +181,10 @@ int main (int argc, char **argv)
   Simulator::Run ();
   Simulator::Destroy ();
   NS_LOG_INFO ("Done.");
+
+#if 0
+  introspect_deinit(intro);
+  intro=NULL;
+#endif  
 }
 

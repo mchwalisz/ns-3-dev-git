@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Gary Pei <guangyu.pei@boeing.com>
+ *         Pjotr Kourzanov <peter.kourzanov@xs4all.nl>
  */
 #include "lr-wpan-spectrum-value-helper.h"
 #include <ns3/log.h>
@@ -141,6 +142,28 @@ LrWpanSpectrumValueHelper::TotalAvgPower (Ptr<const SpectrumValue> psd, uint32_t
   totalAvgPower *= 1.0e6;
 
   return totalAvgPower;
+}
+
+double
+LrWpanSpectrumValueHelper::CentralAvgPower (Ptr<const SpectrumValue> psd, uint32_t channel)
+{
+  NS_LOG_FUNCTION (psd);
+  double centralAvgPower = 0.0;
+
+  //Only the psd relative to the current channel must be used
+  Ptr<SpectrumValue> newPsd = Create <SpectrumValue> (psd->GetSpectrumModel());
+  Ptr<SpectrumValue> oldPsd = psd->Copy();
+
+  (*newPsd)[3 + 5 * (channel - 11)] = (*oldPsd)[3 + 5 * (channel - 11)];
+  (*newPsd)[4 + 5 * (channel - 11)] = (*oldPsd)[4 + 5 * (channel - 11)];
+  (*newPsd)[5 + 5 * (channel - 11)] = (*oldPsd)[5 + 5 * (channel - 11)];
+  (*newPsd)[6 + 5 * (channel - 11)] = (*oldPsd)[6 + 5 * (channel - 11)];
+  (*newPsd)[7 + 5 * (channel - 11)] = (*oldPsd)[7 + 5 * (channel - 11)];
+
+  // numerically integrate to get area under psd using
+  // 1 MHz resolution from 2400 to 2483 MHz (center freq)
+  centralAvgPower = (*newPsd)[5 + 5 * (channel - 11)]*2.0e6;
+  return centralAvgPower;
 }
 
 } // namespace ns3
