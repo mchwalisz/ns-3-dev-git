@@ -120,7 +120,8 @@ LrWpanPhy::GetTypeId (void)
                      "ns3::Packet::TracedCallback")
     .AddTraceSource ("PhyLinkInformation",
                      "Received Power",
-                     MakeTraceSourceAccessor (&LrWpanPhy::m_phyLinkInformation))
+                     MakeTraceSourceAccessor (&LrWpanPhy::m_phyLinkInformation),
+                     "ns3::LrWpanPhy::PhyLinkTracedCallback")
   ;
   return tid;
 }

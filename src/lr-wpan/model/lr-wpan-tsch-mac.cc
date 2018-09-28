@@ -56,77 +56,100 @@ LrWpanTschMac::GetTypeId (void)
     .SetParent<Object> ()
     .AddTraceSource ("MacTxEnqueue",
                      "Trace source indicating a packet has was enqueued in the transaction queue",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxEnqueueTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxEnqueueTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacTxDequeue",
                      "Trace source indicating a packet has was dequeued from the transaction queue",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDequeueTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDequeueTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacTx",
                      "Trace source indicating a packet has arrived for transmission by this device",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacMaxRetries",
                      "Trace source indicating the maximum number of retries has been reached",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macMaxRetries))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macMaxRetries),
+                     "ns3::TracedValueCallback::LrWpanTschMaxRetries")
     .AddTraceSource ("MacTxOk",
                      "Trace source indicating a packet has been successfully sent",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxOkTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxOkTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacTxDrop",
                      "Trace source indicating a packet has been dropped during transmission",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDropTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDropTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacPromiscRx",
                      "A packet has been received by this device, has been passed up from the physical layer "
                      "and is being forwarded up the local protocol stack.  This is a promiscuous trace,",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macPromiscRxTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macPromiscRxTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacRx",
                      "A packet has been received by this device, has been passed up from the physical layer "
                      "and is being forwarded up the local protocol stack.  This is a non-promiscuous trace,",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacRxDrop",
                      "Trace source indicating a packet was received, but dropped before being forwarded up the stack",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxDropTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxDropTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("Sniffer",
                      "Trace source simulating a non-promiscuous packet sniffer attached to the device",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_snifferTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_snifferTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("PromiscSniffer",
                      "Trace source simulating a promiscuous packet sniffer attached to the device",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_promiscSnifferTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_promiscSnifferTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacState",
                      "The state of LrWpan Mac",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macStateLogger))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macStateLogger),
+                     "ns3::LrWpanTschMac::MacStateTracedCallback")
     .AddTraceSource ("MacSentPkt",
                      "Trace source reporting some information about the sent packet",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_sentPktTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_sentPktTrace),
+                     "ns3::Packet::TracedCallback")
 
       //Timeslot type tracing
     .AddTraceSource ("MacEmptyBuffer",
                      "Device has no packet at its buffer",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxEmptyBufferTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxEmptyBufferTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacRxDataTxAck",
                      "Device receives a data packet and sends an ACK",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxDataTxAckTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxDataTxAckTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacTxData",
                      "Device sends a data packet",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDataTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDataTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacRxData",
                      "Device receives a data packet",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxDataTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macRxDataTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacTxDataRxAck",
                      "Device sends a data packet and receives an ACK",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDataRxAckTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macTxDataRxAckTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacSleep",
                      "The timeslot is not assigned for the device",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macSleepTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macSleepTrace),
+                     "ns3::LrWpanTschMac::MacSleepTracedCallback")
     .AddTraceSource ("MacIdle",
                      "Device listens for a packet but does not receive one",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macIdleTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macIdleTrace),
+                     "ns3::LrWpanTschMac::MacIdleTracedCallback")
     .AddTraceSource ("MacChannelBusy",
                      "Device performs a CCA and the channel is busy",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macChannelBusyTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macChannelBusyTrace),
+                     "ns3::LrWpanTschMac::MacChannelBusyTracedCallback")
     .AddTraceSource ("MacWaitAck",
                      "Device sends a data packet, listens for an ACK but does not receive one",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macWaitAckTrace))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macWaitAckTrace),
+                     "ns3::Packet::TracedCallback")
     .AddTraceSource ("MacLinkInformation",
                      "Received power and bias power, Channel, Rx and Tx Node ID.",
-                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macLinkInformation))
+                     MakeTraceSourceAccessor (&LrWpanTschMac::m_macLinkInformation),
+                     "ns3::LrWpanTschMac::MacLinkInformationTracedCallback")
       ;
   return tid;
 }

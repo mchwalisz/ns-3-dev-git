@@ -83,11 +83,13 @@ LrWpanRadioEnergyModel::GetTypeId (void)
 
     .AddTraceSource ("TotalEnergyConsumption",
                      "Total energy consumption of the radio device.",
-                     MakeTraceSourceAccessor (&LrWpanRadioEnergyModel::m_totalEnergyConsumption))
+                     MakeTraceSourceAccessor (&LrWpanRadioEnergyModel::m_totalEnergyConsumption),
+                     "ns3::TracedValueCallback::LrWpanEnergyConsumption")
     .AddTraceSource ("CurrentEnergyState",
                      "Current Phy layer state and corresponding energy consumption of the radio device.",
-                     MakeTraceSourceAccessor (&LrWpanRadioEnergyModel::m_EnergyStateLogger))
-  ; 
+                     MakeTraceSourceAccessor (&LrWpanRadioEnergyModel::m_EnergyStateLogger),
+                     "ns3::TracedValueCallback::LrWpanEnergyState")
+  ;
   return tid;
 }
 
