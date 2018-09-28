@@ -36,7 +36,6 @@ namespace ns3 {
 class Packet;
 class SpectrumValue;
 class LrWpanErrorModel;
-struct LrWpanSpectrumSignalParameters;
 class MobilityModel;
 class SpectrumChannel;
 class SpectrumModel;
@@ -560,7 +559,7 @@ private:
    *                   1: PHR is transmitting
    *                   2: PHY Payload is transmitting
    */
-  void CheckInterference (LrWpanPPDU packetType, Ptr<LrWpanSpectrumSignalParameters> spectrumRxParams);
+  void CheckInterference (LrWpanPPDU packetType, Ptr<SpectrumSignalParameters> spectrumRxParams);
 
   /**
    * Finish the reception of a frame. This is called at the end of a frame
@@ -572,7 +571,7 @@ private:
    *
    * \param params signal parameters of the packet
    */
-  void EndRx (Ptr<LrWpanSpectrumSignalParameters> params);
+  void EndRx (Ptr<SpectrumSignalParameters> params);
 
   /**
    * Cancel an ongoing ED procedure. This is called when the transceiver is
@@ -835,7 +834,7 @@ private:
    * parameter is set to false, if the frame is either invalid or destroyed
    * due to interference.
    */
-  std::pair<Ptr<LrWpanSpectrumSignalParameters>, bool>  m_currentRxPacket;
+  std::pair<Ptr<SpectrumSignalParameters>, bool>  m_currentRxPacket;
 
   /**
    * Statusinformation of the currently transmitted packet. The first parameter

@@ -306,7 +306,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 
   if (lrWpanRxParams == 0)
     {
-      CheckInterference ();
+      CheckInterference (IEEE_802_15_4_PPDU_PAYLOAD, lrWpanRxParams);
       m_signal->AddSignal (spectrumRxParams->psd);
 
       // Update peak power if CCA is in progress.
@@ -379,7 +379,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
       // Std. 802.15.4-2006, appendix E, Figure E.2
       // At SNR < -5 the BER is less than 10e-1.
       // It's useless to even *try* to decode the packet.
-      if (10 * log10 (sinr) > -5)
+      if (10 * log10 (LrWpanSignalPower) > -5)
         {
           ChangeTrxState (IEEE_802_15_4_PHY_BUSY_RX);
           m_currentRxPacket = std::make_pair (lrWpanRxParams, false);
@@ -389,7 +389,7 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
         }
       else
         {
-          NS_LOG_DEBUG("Packet discarded due to low SINR: " << sinr);
+          NS_LOG_DEBUG("Packet discarded due to low SINR: " << LrWpanSignalPower);
           m_phyRxDropTrace (p);
         }
     }
@@ -456,19 +456,19 @@ LrWpanPhy::StartRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 }
 
 void
-LrWpanPhy::CheckInterference (LrWpanPPDU packetType, Ptr<LrWpanSpectrumSignalParameters> spectrumRxParams)
+LrWpanPhy::CheckInterference (LrWpanPPDU packetType, Ptr<SpectrumSignalParameters> spectrumRxParams)
 {
   NS_LOG_FUNCTION (this);
   NS_LOG_DEBUG("Interference time classification is " << packetType);
   //NS_LOG_DEBUG("Current state is " << m_trxState);
   // Calculate whether packet was lost.
   LrWpanSpectrumValueHelper psdHelper;
-  Ptr<LrWpanSpectrumSignalParameters> currentRxParams = m_currentRxPacket.first;
+  Ptr<LrWpanSpectrumSignalParameters> currentRxParams = DynamicCast<LrWpanSpectrumSignalParameters>(m_currentRxPacket.first);
 
   // We are currently receiving a packet.
   if (m_trxState == IEEE_802_15_4_PHY_BUSY_RX)
     {
-      Ptr<LrWpanSpectrumSignalParameters> currentRxParams = m_currentRxPacket.first;
+      Ptr<LrWpanSpectrumSignalParameters> currentRxParams = DynamicCast<LrWpanSpectrumSignalParameters>(m_currentRxPacket.first);
       if (currentRxParams && !m_currentRxPacket.second)
       {
           Ptr<Packet> currentPacket = currentRxParams->packetBurst->GetPackets ().front ();
@@ -526,7 +526,7 @@ LrWpanPhy::CheckInterference (LrWpanPPDU packetType, Ptr<LrWpanSpectrumSignalPar
                     {
                        uint32_t payloadLengthSet = ceil(m_randomdatalength->GetValue());
                        NS_LOG_DEBUG (this << " Radom value for datalength is "<< payloadLengthSet);
-                       Ptr<Packet> packetCorrect = m_currentRxPacket.first->packetBurst->GetPackets().front();
+                       Ptr<Packet> packetCorrect = currentRxParams->packetBurst->GetPackets().front();
                        uint32_t payloadLengthCorrect = packetCorrect->GetSize();
 
                        NS_LOG_DEBUG (this << " Correct Packet Size: " << payloadLengthCorrect << " with duration: " << m_currentRxPacket.first->duration);
@@ -539,7 +539,7 @@ LrWpanPhy::CheckInterference (LrWpanPPDU packetType, Ptr<LrWpanSpectrumSignalPar
                        }
                        else if (payloadLengthSet < payloadLengthCorrect)
                        {
-                           m_currentRxPacket.first->packetBurst->GetPackets().front() = Create<Packet> (payloadLengthSet);
+                           currentRxParams->packetBurst->GetPackets().front() = Create<Packet> (payloadLengthSet);
                            NS_LOG_DEBUG (this << " Packet is cutted and will be discarded at MAC due to wrong received datalength");
                        }
                        else
@@ -567,7 +567,7 @@ LrWpanPhy::CheckInterference (LrWpanPPDU packetType, Ptr<LrWpanSpectrumSignalPar
 }
 
 void
-LrWpanPhy::EndRx (Ptr<LrWpanSpectrumSignalParameters> spectrumRxParams)
+LrWpanPhy::EndRx (Ptr<SpectrumSignalParameters> spectrumRxParams)
 {
   NS_LOG_FUNCTION (this);
   NS_ASSERT (spectrumRxParams != 0);
@@ -612,7 +612,7 @@ LrWpanPhy::EndRx (Ptr<LrWpanSpectrumSignalParameters> spectrumRxParams)
     }
 
   // If this is the end of the currently received packet, check if reception was successfull.
-  Ptr<LrWpanSpectrumSignalParameters> currentRxParams = m_currentRxPacket.first;
+  Ptr<LrWpanSpectrumSignalParameters> currentRxParams = DynamicCast<LrWpanSpectrumSignalParameters>(m_currentRxPacket.first);
   if (currentRxParams == params)
     {
       Ptr<Packet> currentPacket = currentRxParams->packetBurst->GetPackets ().front ();
