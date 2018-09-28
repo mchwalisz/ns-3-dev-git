@@ -35,7 +35,7 @@ namespace ns3 {
 /**
  * \ingroup energy
  * \brief A LrWpan radio energy model.
- * 
+ *
  * 5 states are defined for the radio: TX_ON, BUSY_TX, RX_ON, BUSY_RX, TRX_OFF.
  * Inherit from LrWpanPhyEnumeration
  * The different types of tansactirons that are defined are:

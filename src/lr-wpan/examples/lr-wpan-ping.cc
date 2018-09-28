@@ -59,14 +59,13 @@ int main (int argc, char** argv)
                                  "LayoutType", StringValue ("RowFirst"));
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (nodes);
-  
 
   InternetStackHelper internetv6;
   internetv6.Install (nodes);
 
   SixLowPanHelper sixlowpan;
-  NetDeviceContainer devices = sixlowpan.Install (lrwpanDevices); 
- 
+  NetDeviceContainer devices = sixlowpan.Install (lrwpanDevices);
+
   Ipv6AddressHelper ipv6;
   ipv6.SetBase (Ipv6Address ("2001:2::"), Ipv6Prefix (64));
   Ipv6InterfaceContainer deviceInterfaces;
@@ -75,8 +74,6 @@ int main (int argc, char** argv)
   //std::cout<< deviceInterfaces.GetAddress(0,1)<<std::endl;
   //std::cout<< deviceInterfaces.GetAddress(1,1)<<std::endl;
 
-
-   
   uint32_t packetSize = 10;
   uint32_t maxPacketCount = 5;
   Time interPacketInterval = Seconds (1.);
@@ -96,9 +93,9 @@ int main (int argc, char** argv)
   AsciiTraceHelper ascii;
   lrWpanHelper.EnableAsciiAll (ascii.CreateFileStream ("Ping-6TiSCH-lr-wpan.tr"));
   lrWpanHelper.EnablePcapAll (std::string ("Ping-6TiSCH-lr-wpan"), true);
-  
+
   Simulator::Stop (Seconds (10));
-  
+
   Simulator::Run ();
   Simulator::Destroy ();
 

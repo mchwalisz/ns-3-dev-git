@@ -873,7 +873,7 @@ private:
   Ptr<UniformRandomVariable> m_random;
 
   Ptr<UniformRandomVariable> m_randomdatalength;
-  
+
 };
 
 

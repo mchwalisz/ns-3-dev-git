@@ -511,24 +511,24 @@ LrWpanTschMac::SetMcpsDataConfirmCallback (McpsDataConfirmCallback c)
   m_mcpsDataConfirmCallback = c;
 }
 
-void 
+void
 LrWpanTschMac::SetMlmeSetSlotframeConfirmCallback (MlmeSetSlotframeConfirmCallback c)
 {
   m_mlmeSetSlotframeConfirmCallback = c;
 }
-void 
+void
 LrWpanTschMac::SetMlmeTschModeConfirmCallback (MlmeTschModeConfirmCallback c)
 {
   m_mlmeTschModeConfirmCallback = c;
 }
-void 
+void
 LrWpanTschMac::SetMlmeSetLinkConfirmCallback (MlmeSetLinkConfirmCallback c)
 {
   m_mlmeSetLinkConfirmCallback = c;
 }
 
 /*
-void 
+void
 SetMlmeKeepAliveConfirmCallback (MlmeKeepAliveConfirmCallback c)
 {
   m_mlmeKeepAliveConfirmCallback = c;
@@ -537,7 +537,7 @@ SetMlmeKeepAliveConfirmCallback (MlmeKeepAliveConfirmCallback c)
 void
 LrWpanTschMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi)
 {
-  NS_ASSERT (m_lrWpanMacState == TSCH_MAC_ACK_PENDING  || TSCH_MAC_ACK_PENDING_END || TSCH_MAC_RX || TSCH_PKT_WAIT_END);
+  NS_ASSERT (m_lrWpanMacState == TSCH_MAC_ACK_PENDING || m_lrWpanMacState == TSCH_MAC_ACK_PENDING_END || m_lrWpanMacState == TSCH_MAC_RX || m_lrWpanMacState == TSCH_PKT_WAIT_END);
 
   NS_LOG_FUNCTION (this << psduLength << p << (int)lqi);
 
@@ -578,7 +578,7 @@ LrWpanTschMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi
       LrWpanMacHeader receivedMacHdr;
       p->RemoveHeader (receivedMacHdr);
 
-      McpsDataIndicationParams params;        
+      McpsDataIndicationParams params;
       if (receivedMacHdr.IsSeqNumSup())
           {
             params.m_dsn = 0;
@@ -669,7 +669,7 @@ LrWpanTschMac::PdDataIndication (uint32_t psduLength, Ptr<Packet> p, uint8_t lqi
           if (acceptFrame)
             {
               m_macRxTrace (originalPkt);
-              
+
               if (receivedMacHdr.IsAcknowledgment () && (m_lrWpanMacState == TSCH_MAC_ACK_PENDING || m_lrWpanMacState == TSCH_MAC_ACK_PENDING_END))
                 {
                   LrWpanMacHeader macHdr;
@@ -1222,7 +1222,7 @@ LrWpanTschMac::MlmeSetSlotframeRequest (MlmeSetSlotframeRequestParams params)
       break;
     case MlmeSlotframeOperation_DELETE: //delete
       confirmParams.slotframeHandle = params.slotframeHandle;
-      
+
       for (std::list<MacPibSlotframeAttributes>::iterator i = m_macSlotframeTable.begin();i != m_macSlotframeTable.end();i++)
         {
           if (i->slotframeHandle == params.slotframeHandle) {
@@ -1239,7 +1239,7 @@ LrWpanTschMac::MlmeSetSlotframeRequest (MlmeSetSlotframeRequestParams params)
           }
         }
 
-      if (!foundsf) 
+      if (!foundsf)
         {
           confirmParams.Status = MlmeSetSlotframeConfirmStatus_SLOTFRAME_NOT_FOUND;
         }
@@ -1256,7 +1256,7 @@ LrWpanTschMac::MlmeSetSlotframeRequest (MlmeSetSlotframeRequestParams params)
           }
         }
 
-      if (!foundsf) 
+      if (!foundsf)
         {
           confirmParams.Status = MlmeSetSlotframeConfirmStatus_SLOTFRAME_NOT_FOUND;
         }
@@ -1300,7 +1300,7 @@ LrWpanTschMac::MlmeSetLinkRequest (MlmeSetLinkRequestParams params)
           }
         }
       }*/
-    
+
       entry.macLinkHandle = params.linkHandle;
       entry.macLinkOptions = params.linkOptions; //b0 = Transmit, b1 = Receive, b2 = Shared, b3= Timekeeping, b4–b7 reserved.
       entry.macLinkType = params.linkType;
@@ -1316,7 +1316,7 @@ LrWpanTschMac::MlmeSetLinkRequest (MlmeSetLinkRequestParams params)
       confirmParams.Status = MlmeSetLinkConfirmStatus_SUCCESS;
 
       break;
-    case MlmeSetLinkRequestOperation_DELETE_LINK:    
+    case MlmeSetLinkRequestOperation_DELETE_LINK:
       for (std::list<MacPibLinkAttributes>::iterator i = m_macLinkTable.begin();i != m_macLinkTable.end();i++)
         {
           if (i->slotframeHandle == params.slotframeHandle && i->macLinkHandle == params.linkHandle) {
@@ -1336,7 +1336,7 @@ LrWpanTschMac::MlmeSetLinkRequest (MlmeSetLinkRequestParams params)
           }
         }
 
-      if (!foundlink) 
+      if (!foundlink)
         {
           confirmParams.Status = MlmeSetLinkConfirmStatus_UNKNOWN_LINK;
         }
@@ -1369,7 +1369,7 @@ LrWpanTschMac::MlmeSetLinkRequest (MlmeSetLinkRequestParams params)
           }
         }
 
-      if (!foundlink) 
+      if (!foundlink)
         {
           confirmParams.Status = MlmeSetLinkConfirmStatus_UNKNOWN_LINK;
         }
@@ -1460,7 +1460,7 @@ LrWpanTschMac::IncAsn()
       Simulator::ScheduleNow(&LrWpanTschMac::MlmeSetLinkRequest,this,m_waitingLinkParams);
     }
 
-  for (std::list<MacPibSlotframeAttributes>::iterator it = m_macSlotframeTable.begin();it != m_macSlotframeTable.end();it++) 
+  for (std::list<MacPibSlotframeAttributes>::iterator it = m_macSlotframeTable.begin();it != m_macSlotframeTable.end();it++)
     {
       Simulator::ScheduleNow(&LrWpanTschMac::ScheduleTimeslot,this,it->slotframeHandle,it->size);
     }
@@ -1500,7 +1500,7 @@ LrWpanTschMac::ScheduleTimeslot(uint8_t handle, uint16_t size)
           m_currentChannel = def_MacChannelHopping.m_macHoppingSequenceList[
             (m_macTschPIBAttributes.m_macASN+it->macChannelOffset) % def_MacChannelHopping.m_macHoppingSequenceLength
             ];
-          
+
           m_macTxID = it->macTxID;
           m_macRxID = it->macRxID;
 
@@ -1513,7 +1513,7 @@ LrWpanTschMac::ScheduleTimeslot(uint8_t handle, uint16_t size)
           } else {
               phyattr->phyLinkFadingBias = 1;
 	  }
-	  NS_LOG_DEBUG (this << "setting for channel " << (int)m_currentChannel 
+	  NS_LOG_DEBUG (this << "setting for channel " << (int)m_currentChannel
                 << " fading bias: " <<
 		phyattr->phyLinkFadingBias);
 	  m_currentFadingBias = 10 * log10(phyattr->phyLinkFadingBias);
@@ -1574,7 +1574,7 @@ LrWpanTschMac::ScheduleTimeslot(uint8_t handle, uint16_t size)
 
   //If not involved in the current timeslot turnoff the radio
   if (!myts)
-    { 
+    {
       NS_LOG_DEBUG("No link in this timeslot, turning off the radio");
       Simulator::ScheduleNow (&LrWpanPhy::PlmeSetTRXStateRequest,m_phy,IEEE_802_15_4_PHY_TRX_OFF);
 
@@ -1632,7 +1632,7 @@ void
 LrWpanTschMac::ResetMacTschPibAttributes ()
 {
   LrwpanMacTschPibAttributes def_MacTsch;
-  
+
   def_MacTsch.macMinBE = 1;
   def_MacTsch.macMaxBE = 7;
   def_MacTsch.m_macDisconnectTime = 255;
