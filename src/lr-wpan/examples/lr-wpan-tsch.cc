@@ -37,6 +37,7 @@
 #include <ns3/mobility-module.h>
 #include <ns3/spectrum-helper.h>
 #include <ns3/applications-module.h>
+#include <ns3/internet-apps-module.h>
 #include <ns3/adhoc-aloha-noack-ideal-phy-helper.h>
 #include <ns3/waveform-generator-helper.h>
 #include <ns3/spectrum-analyzer-helper.h>
@@ -233,16 +234,16 @@ int main (int argc, char** argv)
   Ipv6InterfaceContainer deviceInterfaces = ipv6.Assign (devices);
 
   for (int i = 1;i<=nrnodes;i++) {
-	  deviceInterfaces.SetForwarding(i,true);
-	  deviceInterfaces.SetDefaultRoute(i,0);
+    deviceInterfaces.SetForwarding(i,true);
+    deviceInterfaces.SetDefaultRoute(i,0);
   }
 
   for (int i=0;i<=nrnodes;i++) {
-	Ptr<Node> n=lrwpanNodes.Get(i);
-  	cout << "=== node " << deviceInterfaces.GetAddress(i,0) 
-	     << " (IEEE " << DynamicCast<LrWpanTschNetDevice>(netdev.Get(i))->GetMac()->GetShortAddress() << ")"
-	     << " ===" << endl;
-	stackHelper.PrintRoutingTable (n);
+  Ptr<Node> n=lrwpanNodes.Get(i);
+    cout << "=== node " << deviceInterfaces.GetAddress(i,0)
+       << " (IEEE " << DynamicCast<LrWpanTschNetDevice>(netdev.Get(i))->GetMac()->GetShortAddress() << ")"
+       << " ===" << endl;
+  stackHelper.PrintRoutingTable (n);
   }
 
   //Ping6
@@ -261,7 +262,7 @@ int main (int argc, char** argv)
       apps.Add (ping6.Install (lrwpanNodes.Get (i)));
     }
   for (int i=1; i<=nrnodes; i++) {
-  	apps.Get(i-1)->SetStartTime (Seconds (i-1));
+    apps.Get(i-1)->SetStartTime (Seconds (i-1));
   }
   apps.Stop (Seconds (duration));
 
