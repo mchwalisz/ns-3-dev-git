@@ -325,6 +325,23 @@ LrWpanRadioEnergyModel::HandleEnergyDepletion (void)
   m_sourcedepleted = 1;
 }
 
+void
+LrWpanRadioEnergyModel::HandleEnergyRecharged (void)
+{
+  NS_LOG_FUNCTION (this);
+  // NS_LOG_DEBUG ("LrWpanRadioEnergyModel:Energy is !");
+  NS_FATAL_ERROR ("LrWpanRadioEnergyModel:HandleEnergyRecharged not implemented");
+  m_sourcedepleted = 0;
+}
+
+void
+LrWpanRadioEnergyModel::HandleEnergyChanged (void)
+{
+  NS_LOG_FUNCTION (this);
+  // NS_LOG_DEBUG ("LrWpanRadioEnergyModel:Energy is charged!");
+  NS_FATAL_ERROR ("LrWpanRadioEnergyModel:HandleEnergyChanged not implemented");
+}
+
 /*
  * Private functions start here.
  */

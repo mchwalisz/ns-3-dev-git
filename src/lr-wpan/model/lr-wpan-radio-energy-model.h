@@ -130,11 +130,16 @@ public:
   /**
    * \brief Handles energy recharged.
    *
-   * Not implemented
+   * Implements DeviceEnergyModel::HandleEnergyRecharged
    */
-  virtual void HandleEnergyRecharged (void)
-  {
-  }
+  virtual void HandleEnergyRecharged (void);
+
+  /**
+   * \brief Handles energy changes.
+   *
+   * Implements DeviceEnergyModel::HandleEnergyChanged
+   */
+  virtual void HandleEnergyChanged (void);
 
   /**
    * \brief Change state of the LrWpanRadioEnergyMode
