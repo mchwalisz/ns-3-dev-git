@@ -64,7 +64,8 @@ LrWpanEnergySource::GetTypeId (void)
                     MakeBooleanChecker ())
     .AddTraceSource ("RemainingEnergy",
                      "Remaining energy at LrWpanEnergySource.",
-                     MakeTraceSourceAccessor (&LrWpanEnergySource::m_remainingEnergyJ))
+                     MakeTraceSourceAccessor (&LrWpanEnergySource::m_remainingEnergyJ),
+                     "ns3::TracedValueCallback::LrWpanEnergySourceRemaining")
 
   ;
   return tid;
